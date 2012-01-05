@@ -1,0 +1,4 @@
+.ninja_log
+build.out
+*.o
+*.a
