@@ -5,6 +5,7 @@
 
 #include <cmath>
 #include <iomanip>
+#include <fstream>
 
 #include <boost/math/common_factor.hpp>
 #include <boost/program_options.hpp>
@@ -159,13 +160,13 @@ void Jacobi2DGenerator::generateLocals(std::ostream& stream,
   stream << "  __global " << params.dataType
          << "* inputPtr = input + ((get_group_id(1)*" << params.realPerBlockY
          << "+get_local_id(1)*" << params.elementsPerThread << "+1)*"
-         << params.paddedSize << ") + (get_local_id(0)*" << params.realPerBlockX
+         << params.paddedSize << ") + (get_group_id(0)*" << params.realPerBlockX
          << ") + get_local_id(0) + 1;\n";
 
   stream << "  __global " << params.dataType
          << "* outputPtr = output + ((get_group_id(1)*" << params.realPerBlockY
          << "+get_local_id(1)*" << params.elementsPerThread << "+1)*"
-         << params.paddedSize << ") + (get_local_id(0)*" << params.realPerBlockX
+         << params.paddedSize << ") + (get_group_id(0)*" << params.realPerBlockX
          << ") + get_local_id(0) + 1;\n";
 
   // Compute some guards
@@ -173,7 +174,7 @@ void Jacobi2DGenerator::generateLocals(std::ostream& stream,
          << ") + get_local_id(0) + 1;\n";
   stream << "  int globalIndexY;\n";
   stream << "  bool validX = globalIndexX >= " << params.padding
-         << " && globalIndexY < " << (params.realSize+params.padding) << ";\n";
+         << " && globalIndexX < " << (params.realSize+params.padding) << ";\n";
 
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  globalIndexY = get_group_id(1)*" << params.realPerBlockY
@@ -227,10 +228,12 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
            << "));\n";
     stream << "    " << params.dataType
            << " result = 0.2" << params.fpSuffix
-           << " * val0+val1+val2+val3+val4;\n";
+           << " * (val0+val1+val2+val3+val4);\n";
     stream << "    result = (valid" << i << ") ? result : 0.0"
            << params.fpSuffix << ";\n";
-    stream << "    buffer[get_local_id(1)+1][get_local_id(0)+1] = result;\n";
+    stream << "    buffer[get_local_id(1)*" << params.elementsPerThread << "+"
+           << i
+           << "+1][get_local_id(0)+1] = result;\n";
     stream << "    local" << i << " = result;\n";
     stream << "  }\n";
   }
@@ -243,22 +246,26 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
       stream << "  {\n";
       stream << "    " << params.dataType << " val0, val1, val2, val3, val4;\n";
       stream << "    // Left\n";
-      stream << "    val0 = buffer[get_local_id(1)+" << i
+      stream << "    val0 = buffer[get_local_id(1)*" << params.elementsPerThread
+             << "+" << i
              << "+1][get_local_id(0)];\n";
       stream << "    // Center\n";
       stream << "    val1 = local" << i << ";\n";
       stream << "    // Right\n";
-      stream << "    val2 = buffer[get_local_id(1)+" << i
+      stream << "    val2 = buffer[get_local_id(1)*" << params.elementsPerThread
+             << "+" << i
              << "+1][get_local_id(0)+2];\n";
       stream << "    // Top\n";
-      stream << "    val3 = buffer[get_local_id(1)+" << i
+      stream << "    val3 = buffer[get_local_id(1)*" << params.elementsPerThread
+             << "+" << i
              << "][get_local_id(0)+1];\n";
       stream << "    // Bottom\n";
-      stream << "    val4 = buffer[get_local_id(1)+" << i
+      stream << "    val4 = buffer[get_local_id(1)*" << params.elementsPerThread
+             << "+" << i
              << "+2][get_local_id(0)+1];\n";
       stream << "    " << params.dataType
              << " result = 0.2" << params.fpSuffix
-             << " * val0+val1+val2+val3+val4;\n";
+             << " * (val0+val1+val2+val3+val4);\n";
       stream << "    result = (valid" << i << ") ? result : 0.0"
              << params.fpSuffix << ";\n";
       stream << "    new" << i << " = result;\n";
@@ -266,13 +273,15 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
     }
     stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
     for(int32_t i = 0; i < params.elementsPerThread; ++i) {
-      stream << "  buffer[get_local_id(1)+" << i
+      stream << "  buffer[get_local_id(1)*" << params.elementsPerThread << "+"
+             << i
              << "+1][get_local_id(0)+1] = new" << i << ";\n";
+      stream << "  local" << i << " = new" << i << ";\n";
     }
     stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
   }
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
-    stream << "  if(writeValid" << i << ") {\n";
+    stream << "  if(writeValid" << i << " && writeValidX) {\n";
     stream << "    *(outputPtr+(" << params.paddedSize << "*" << i
            << ")) = local" << i << ";\n";
     stream << "  }\n";
@@ -292,9 +301,10 @@ void compareResults(float* host, float* device, const GeneratorParams& params) {
       float h = host[i*params.paddedSize + j];
       float d = device[i*params.paddedSize + j];
       
-      diff       = h - h;
-      errorNorm += diff * diff;
-      refNorm   += h *      h;
+      diff       = h - d;
+      //      std::cout << "h: " << h << "  d: " << d << "  diff: " << diff << "\n";
+      errorNorm += diff*diff;
+      refNorm   += h*h;
     }
   }
   
@@ -318,7 +328,9 @@ void compareResults(float* host, float* device, const GeneratorParams& params) {
 int main(int argc,
          char** argv) {
 
-  cl_int result;
+  cl_int      result;
+  std::string kernelFile;
+  std::string saveKernelFile;
   
   srand(123456);
  
@@ -346,7 +358,12 @@ int main(int argc,
     ("time-tile-size,s",
      po::value<int32_t>(&params.timeTileSize)->default_value(1),
      "Set time tile size")
-    ("print-kernel,p", "Print generated kernel")
+    ("load-kernel,f",
+     po::value<std::string>(&kernelFile)->default_value(""),
+     "Load kernel from disk")
+    ("save-kernel,w",
+     po::value<std::string>(&saveKernelFile)->default_value(""),
+     "Save kernel to disk")
     ("verify,v", "Verify results")
     ;
 
@@ -358,11 +375,23 @@ int main(int argc,
     std::cerr << desc;
     return 1;
   }
-  
-  std::string kernelSource = gen.generate(params);
 
-  if(vm.count("print-kernel")) {
-    std::cout << kernelSource << "\n\n";
+  std::string kernelSource;
+  
+  if(kernelFile.size() == 0) {
+    kernelSource = gen.generate(params);
+  } else {
+    std::ifstream kernelStream(kernelFile.c_str());
+    kernelSource = std::string(std::istreambuf_iterator<char>(kernelStream),
+                               (std::istreambuf_iterator<char>()));
+    kernelStream.close();
+    params.computeDerived();
+  }
+
+  if(saveKernelFile.size() != 0) {
+    std::ofstream kernelStream(saveKernelFile.c_str());
+    kernelStream << kernelSource;
+    kernelStream.close();
   }
 
   printValue("Problem Size", params.problemSize);
@@ -375,6 +404,7 @@ int main(int argc,
   printValue("Num Blocks Y", params.numBlocksY);
   printValue("Time Steps", params.timeSteps);
   printValue("Padding", params.padding);
+  printValue("Real Size", params.realSize);
   
   int arraySize = params.paddedSize * params.paddedSize * sizeof(float);
 
@@ -562,5 +592,9 @@ int main(int argc,
   // Clean-up
   delete [] hostData;
 
+  if(vm.count("verify")) {
+    delete [] reference;
+  }
+  
   return 0;
 }
