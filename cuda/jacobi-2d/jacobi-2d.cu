@@ -110,9 +110,9 @@ __global__
 void jacobi_2d_kernel_overlapped(FloatType* input, FloatType* output,
                                  int32_t problemSize) {
   // Determine our start position
-  int offsetI = blockIdx.x * (blockDim.x-2*(TIME_TILE_SIZE-1)) + threadIdx.x;
+  int offsetI = blockIdx.y * (blockDim.y-2*(TIME_TILE_SIZE-1)) + threadIdx.y;
   offsetI -= TIME_TILE_SIZE-1;
-  int offsetJ = blockIdx.y * (blockDim.y-2*(TIME_TILE_SIZE-1)) + threadIdx.y;
+  int offsetJ = blockIdx.x * (blockDim.x-2*(TIME_TILE_SIZE-1)) + threadIdx.x;
   offsetJ -= TIME_TILE_SIZE-1;
 
   // Load data into shared
@@ -137,9 +137,9 @@ void jacobi_2d_kernel_overlapped(FloatType* input, FloatType* output,
                  ? input[offsetI*problemSize+offsetJ+1] : ZERO;
 
   FloatType average = (l + c + r + t + b) / FIVE;
-  buffer[threadIdx.x*blockDim.x+threadIdx.y] = 
+  buffer[threadIdx.y*blockDim.y+threadIdx.x] =
     ((offsetI >= 0) && (offsetI <= (problemSize-1)) &&
-    (offsetJ >= 0) && (offsetJ <= (problemSize-1))) ? average : buffer[threadIdx.x*blockDim.x+threadIdx.y];
+    (offsetJ >= 0) && (offsetJ <= (problemSize-1))) ? average : buffer[threadIdx.y*blockDim.y+threadIdx.x];
 
   __syncthreads();
 
@@ -150,12 +150,17 @@ void jacobi_2d_kernel_overlapped(FloatType* input, FloatType* output,
   // Perform the time iterations
 #pragma unroll
   for(int t = 0; t < TIME_TILE_SIZE-1; ++t) {
-    FloatType c = buffer[threadIdx.x*blockDim.x+threadIdx.y];
-    FloatType l = (threadIdx.x > 0) ? buffer[(threadIdx.x-1)*blockDim.x+threadIdx.y] : ZERO;
-    FloatType r = (threadIdx.x < blockDim.x-1) ? buffer[(threadIdx.x+1)*blockDim.x+threadIdx.y] : ZERO;
-    FloatType t = (threadIdx.y > 0) ? buffer[threadIdx.x*blockDim.x+threadIdx.y-1] : ZERO;
-    FloatType b = (threadIdx.y < blockDim.y-1) ? buffer[threadIdx.x*blockDim.x+threadIdx.y+1] : ZERO;
+    FloatType c = buffer[threadIdx.y*blockDim.y+threadIdx.x];
 
+    //FloatType l = (threadIdx.y > 0) ? buffer[(threadIdx.y-1)*blockDim.y+threadIdx.x] : ZERO;
+    //FloatType r = (threadIdx.y < blockDim.y-1) ? buffer[(threadIdx.y+1)*blockDim.y+threadIdx.x] : ZERO;
+    //FloatType t = (threadIdx.x > 0) ? buffer[threadIdx.y*blockDim.y+threadIdx.x-1] : ZERO;
+    //FloatType b = (threadIdx.x < blockDim.x-1) ? buffer[threadIdx.y*blockDim.y+threadIdx.x+1] : ZERO;
+
+    //FloatType l = buffer[((threadIdx.y-1)*blockDim.y+threadIdx.x) % blockDim.x];
+    //FloatType r = buffer[((threadIdx.y+1)*blockDim.y+threadIdx.x) % blockDim.x];
+    //FloatType t = buffer[((threadIdx.y)*blockDim.y+threadIdx.x-1) % blockDim.x];
+    //FloatType b = buffer[((threadIdx.y)*blockDim.y+threadIdx.x+1) % blockDim.x];
     FloatType average = (l + c + r + t + b) / FIVE;
 
 #ifdef DEBUG
@@ -167,9 +172,9 @@ void jacobi_2d_kernel_overlapped(FloatType* input, FloatType* output,
     // Sync before overwriting shared
     __syncthreads();
 
-    buffer[threadIdx.x*blockDim.x+threadIdx.y] = 
+    buffer[threadIdx.y*blockDim.y+threadIdx.x] =
       ((offsetI >= 0) && (offsetI <= (problemSize-1)) &&
-      (offsetJ >= 0) && (offsetJ <= (problemSize-1))) ? average : buffer[threadIdx.x*blockDim.x+threadIdx.y];
+      (offsetJ >= 0) && (offsetJ <= (problemSize-1))) ? average : buffer[threadIdx.y*blockDim.y+threadIdx.x];
 
     // Sync before re-reading shared
     __syncthreads();
@@ -179,7 +184,7 @@ void jacobi_2d_kernel_overlapped(FloatType* input, FloatType* output,
      threadIdx.x <= (blockDim.x-1-(TIME_TILE_SIZE-1)) &&
      threadIdx.y >= (TIME_TILE_SIZE-1) &&
      threadIdx.y <= (blockDim.y-1-(TIME_TILE_SIZE-1))) {
-    output[offsetI*problemSize+offsetJ] = buffer[threadIdx.x*blockDim.x+threadIdx.y];
+    output[offsetI*problemSize+offsetJ] = buffer[threadIdx.y*blockDim.y+threadIdx.x];
 #ifdef DEBUG
     printf("[%d, %d]: Write output at %d\n", blockIdx.x, threadIdx.x, baseOffset);
 #endif
