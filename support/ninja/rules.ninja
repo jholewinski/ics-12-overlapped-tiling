@@ -1,0 +1,13 @@
+
+# Define a basic set of rules
+rule cxx-build
+  command = $cxx $cxxflags -c $in -o $out
+  description = CXX - $in
+
+rule link-executable
+  command = $cxx $ldflags $in -o $out
+  description = LINK - $out
+
+rule static-lib
+  command = $ar rcs $out $in
+  description = AR - $out

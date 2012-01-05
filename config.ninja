@@ -1,0 +1,8 @@
+
+cxx = g++
+ar = ar
+
+cxxflags = -O2 -g
+ldflags = -O2 -g
+
+bindir = build.out

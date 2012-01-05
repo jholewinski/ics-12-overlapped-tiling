@@ -1,0 +1,8 @@
+
+path = opencl
+
+# All OpenCL sources need access to the common library
+cxxflags = $cxxflags -Iopencl/common/inc
+
+include $path/common/common.ninja
+
