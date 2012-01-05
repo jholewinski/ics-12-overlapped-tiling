@@ -1,0 +1,1 @@
+This directory contains headers and libraries for linking with OpenCL. The libOpenCL.so file here may not be appropriate for use, it is simply here to give the linker something to link against. The real, platform-specific version is picked up from the system at run-time.
