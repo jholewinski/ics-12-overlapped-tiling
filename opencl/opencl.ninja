@@ -7,5 +7,5 @@ ldflags = $ldflags -Lsupport/opencl/lib -lOpenCL
 
 subninja $path/common/common.ninja
 subninja $path/jacobi-2d/jacobi-2d.ninja
-#subninja $path/jacobi-3d/jacobi-3d.ninja
+subninja $path/jacobi-3d/jacobi-3d.ninja
 
