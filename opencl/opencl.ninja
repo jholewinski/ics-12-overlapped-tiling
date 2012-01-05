@@ -3,6 +3,7 @@ path = opencl
 
 # All OpenCL sources need access to the common library
 cxxflags = $cxxflags -Iopencl/common/inc -I$opencl_headers -Isupport/cl-cpp
+ldflags = $ldflags -lOpenCL
 
 subninja $path/common/common.ninja
 subninja $path/jacobi-2d/jacobi-2d.ninja

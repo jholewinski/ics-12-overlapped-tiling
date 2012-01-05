@@ -2,7 +2,8 @@
 path = opencl/common
 
 # Sources
+build $path/src/CLContext.o : cxx-build $path/src/CLContext.cpp
 build $path/src/ProgramGenerator.o : cxx-build $path/src/ProgramGenerator.cpp
 
 # Library
-build $bindir/libclcommon.a : static-lib $path/src/ProgramGenerator.o
+build $bindir/libclcommon.a : static-lib $path/src/ProgramGenerator.o $path/src/CLContext.o
