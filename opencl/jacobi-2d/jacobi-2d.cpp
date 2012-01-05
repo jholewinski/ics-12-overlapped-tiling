@@ -82,6 +82,13 @@ struct GeneratorParams {
     } else {
       fpSuffix = "";
     }
+
+    if(padding < 1 || compsPerBlockX < 1 || compsPerBlockY < 1               ||
+       realPerBlockX < 1 || realPerBlockY < 1 || sizeLCM < 1 || realSize < 1 ||
+       numBlocksX < 1 || numBlocksY < 1 || sharedSizeX < 1                   ||
+       sharedSizeY < 1 || paddedSize < 1) {
+      throw std::runtime_error("Consistency error!");
+    }
   }
 };
 
@@ -537,7 +544,14 @@ int main(int argc,
   double gflops   = (double)params.problemSize * (double)params.problemSize
     * 5.0 * (double)params.timeSteps / elapsed / 1e9;
   //double gflops = stencilGen.computeGFlops(elapsed);
-  printValue("GFlop/s", gflops);
+  printValue("Actual GFlop/s", gflops);
+
+  gflops = (double)params.blockSizeX * (double)params.blockSizeY
+    * (double)params.numBlocksX * (double)params.numBlocksY
+    * (double)params.elementsPerThread * 5.0 * (double)params.timeSteps
+    / elapsed / 1e9;
+
+  printValue("Device GFlop/s", gflops);
   
   if(vm.count("verify")) {
     compareResults(reference, hostData, params);
