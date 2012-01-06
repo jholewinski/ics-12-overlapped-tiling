@@ -1,0 +1,11 @@
+name:         Gradient Scaling
+outfile:      gradient-scaling.dat
+binary:       ../build.out/ocl-gradient-2d
+dimensions:   2
+parameters:
+    block_size_x:         [4, 32, 4]
+    block_size_y:         [4, 32, 4]
+    time_tile_size:       [1, 6]
+    problem_size:         1024
+    time_steps:           64
+    elements_per_thread:  [1, 12]
