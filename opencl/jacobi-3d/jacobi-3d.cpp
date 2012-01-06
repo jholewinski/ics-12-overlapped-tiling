@@ -76,9 +76,9 @@ struct GeneratorParams {
     compsPerBlockX = blockSizeX;
     compsPerBlockY = blockSizeY*elementsPerThread;
     compsPerBlockZ = blockSizeZ;
-    realPerBlockX  = compsPerBlockX - 2*timeTileSize;
-    realPerBlockY  = compsPerBlockY - 2*timeTileSize;
-    realPerBlockZ  = compsPerBlockZ - 2*timeTileSize;
+    realPerBlockX  = compsPerBlockX - 2*(timeTileSize-1);
+    realPerBlockY  = compsPerBlockY - 2*(timeTileSize-1);
+    realPerBlockZ  = compsPerBlockZ - 2*(timeTileSize-1);
     sizeLCM        = boost::math::lcm(realPerBlockZ,
                                       boost::math::lcm(realPerBlockX,
                                                        realPerBlockY));
@@ -349,19 +349,22 @@ void compareResults(float* host, float* device, const GeneratorParams& params) {
 
   for(int i = params.padding; i < params.paddedSize-params.padding; ++i) {
     for(int j = params.padding; j < params.paddedSize-params.padding; ++j) {
+      for(int k = params.padding; k < params.paddedSize-params.padding; ++k) {
       
-      float h = host[i*params.paddedSize + j];
-      float d = device[i*params.paddedSize + j];
+        float h
+        = host[i*params.paddedSize*params.paddedSize+j*params.paddedSize+k];
+        float d
+        = device[i*params.paddedSize*params.paddedSize+j*params.paddedSize+k];
       
-      diff       = h - d;
-      //      std::cout << "h: " << h << "  d: " << d << "  diff: " << diff << "\n";
-      errorNorm += diff*diff;
-      refNorm   += h*h;
+        diff       = h - d;
+        errorNorm += diff*diff;
+        refNorm   += h*h;
+      }
     }
   }
   
   errorNorm = std::sqrt(errorNorm);
-  refNorm = std::sqrt(refNorm);
+  refNorm   = std::sqrt(refNorm);
 
   printValue("Error Norm", errorNorm);
   printValue("Ref Norm", refNorm);
@@ -406,7 +409,7 @@ int main(int argc,
      "Set block size (Y)")
     ("block-size-z,z",
      po::value<int32_t>(&params.blockSizeZ)->default_value(8),
-     "Set block size (Y)")
+     "Set block size (Z)")
     ("elements-per-thread,e",
      po::value<int32_t>(&params.elementsPerThread)->default_value(1),
      "Set elements per thread")
@@ -645,8 +648,8 @@ int main(int argc,
                                    NULL, NULL);
   CLContext::throwOnError("Failed to copy result to host", result);
 
-  double gflops   = (double)params.problemSize * (double)params.problemSize
-    * (double)params.problemSize
+  double gflops   = (double)params.realSize * (double)params.realSize
+    * (double)params.realSize
     * 7.0 * (double)params.timeSteps / elapsed / 1e9;
   //double gflops = stencilGen.computeGFlops(elapsed);
   printValue("Actual GFlop/s", gflops);
