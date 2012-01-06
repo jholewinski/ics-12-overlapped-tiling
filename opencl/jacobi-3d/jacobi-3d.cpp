@@ -650,6 +650,8 @@ int main(int argc,
                                    NULL, NULL);
   CLContext::throwOnError("Failed to copy result to host", result);
 
+  printValue("Elapsed Time", elapsed);
+
   double gflops   = (double)params.realSize * (double)params.realSize
     * (double)params.realSize
     * 7.0 * (double)params.timeSteps / elapsed / 1e9;

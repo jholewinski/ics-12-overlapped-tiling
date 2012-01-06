@@ -710,6 +710,8 @@ int main(int argc,
                                    NULL, NULL);
   CLContext::throwOnError("Failed to copy result to host", result);
 
+  printValue("Elapsed Time", elapsed);
+
   // Could be 47 depending on how you count
   double compsPerPt = 42.0;
   

@@ -19,6 +19,11 @@ def _parse_range(value):
         return range(value[0], value[1]+1, value[2])
     elif len(value) == 2:
         return range(value[0], value[1]+1, 1)
+    elif len(value) == 1:
+        return [value[0]]
+    else:
+        print('Unable to handle object')
+        sys.exit(1)
 
 def _query_range(data, name, default):
     try:
