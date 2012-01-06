@@ -50,6 +50,7 @@ CLContext::~CLContext() {
 void CLContext::throwOnError(const char* where,
                              cl_int result) throw (std::runtime_error) {
   if(result != CL_SUCCESS) {
+    std::cout << "OpenCL Error Code: " << result << "\n";
     throw std::runtime_error(where);
   }
 }
