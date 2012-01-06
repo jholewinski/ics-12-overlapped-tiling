@@ -1,0 +1,10 @@
+
+path = opencl/fdtd-2d
+
+# Sources
+build $path/fdtd-2d.o : cxx-build $path/fdtd-2d.cpp
+
+# Executable
+build $bindir/ocl-fdtd-2d : link-executable $path/fdtd-2d.o $bindir/libclcommon.a
+  ldflags = $ldflags -lboost_program_options
+

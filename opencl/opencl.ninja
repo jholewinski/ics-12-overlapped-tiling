@@ -6,7 +6,7 @@ cxxflags = $cxxflags -Iopencl/common/inc -I$opencl_headers -Isupport/opencl/inc
 ldflags = $ldflags -Lsupport/opencl/lib -lOpenCL
 
 subninja $path/common/common.ninja
+subninja $path/fdtd-2d/fdtd-2d.ninja
 subninja $path/jacobi-2d/jacobi-2d.ninja
 subninja $path/jacobi-3d/jacobi-3d.ninja
 subninja $path/rician-denoise-2d/rician-denoise-2d.ninja
-
