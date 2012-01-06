@@ -549,6 +549,15 @@ int main(int argc,
   printValue("Max Work-Group Size", maxWorkGroupSize);
   
 
+  if(params.blockSizeX*params.blockSizeY > maxWorkGroupSize) {
+    std::cout << "ERROR: Block dimensions are too large!\n";
+    return 1;
+  }
+
+  if(3*params.sharedSizeX*params.sharedSizeY > localMemorySize) {
+    std::cout << "ERROR: Not enough local memory for even one block!\n";
+    return 1;
+  }
 
   // Create a command queue.
   cl::CommandQueue queue(context.context(), context.device(), 0, &result);

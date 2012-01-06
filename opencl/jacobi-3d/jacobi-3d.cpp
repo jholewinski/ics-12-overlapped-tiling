@@ -488,7 +488,17 @@ int main(int argc,
   printValue("Local Memory Size", localMemorySize);
   printValue("Max Compute Units", maxComputeUnits);
   printValue("Max Work-Group Size", maxWorkGroupSize);
-  
+
+  if(params.blockSizeX*params.blockSizeY*params.blockSizeZ > maxWorkGroupSize) {
+    std::cout << "ERROR: Block dimensions are too large!\n";
+    return 1;
+  }
+
+  if(params.sharedSizeX*params.sharedSizeY*params.sharedSizeZ >
+     localMemorySize) {
+    std::cout << "ERROR: Not enough local memory for even one block!\n";
+    return 1;
+  }
 
 
   // Create a command queue.
