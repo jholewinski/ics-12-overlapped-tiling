@@ -65,11 +65,11 @@ struct GeneratorParams {
 
   void computeDerived() {
     // Compute derived values
-    padding        = timeTileSize + 1;
+    padding        = timeTileSize;
     compsPerBlockX = blockSizeX;
     compsPerBlockY = blockSizeY*elementsPerThread;
-    realPerBlockX  = compsPerBlockX - 2*timeTileSize;
-    realPerBlockY  = compsPerBlockY - 2*timeTileSize;
+    realPerBlockX  = compsPerBlockX - 2*(timeTileSize-1);
+    realPerBlockY  = compsPerBlockY - 2*(timeTileSize-1);
     sizeLCM        = boost::math::lcm(realPerBlockX, realPerBlockY);
     realSize       = (problemSize / sizeLCM) * sizeLCM;
     numBlocksX     = realSize / realPerBlockX;
@@ -185,17 +185,18 @@ void Jacobi2DGenerator::generateLocals(std::ostream& stream,
            << (params.realSize+params.padding) << ";\n";
   }
 
-  stream << "  bool writeValidX = get_local_id(0) >= " << params.timeTileSize
+  stream << "  bool writeValidX = get_local_id(0) >= "
+         << (params.timeTileSize-1)
          << " && get_local_id(0) < "
-         << (params.realPerBlockX+params.timeTileSize) << ";\n";
+         << (params.realPerBlockX+params.timeTileSize-1) << ";\n";
   stream << "  int effectiveTidY;\n";
   
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  effectiveTidY = get_local_id(1)*" << params.elementsPerThread
            << " + " << i << ";\n";
     stream << "  bool writeValid" << i << " = effectiveTidY >= "
-           << params.timeTileSize << " && effectiveTidY < "
-           << (params.realPerBlockY+params.timeTileSize) << ";\n";
+           << params.timeTileSize-1 << " && effectiveTidY < "
+           << (params.realPerBlockY+params.timeTileSize-1) << ";\n";
   }
 
   // Declare local intermediates
@@ -571,7 +572,7 @@ int main(int argc,
                                    NULL, NULL);
   CLContext::throwOnError("Failed to copy result to host", result);
 
-  double gflops   = (double)params.problemSize * (double)params.problemSize
+  double gflops   = (double)params.realSize * (double)params.realSize
     * 5.0 * (double)params.timeSteps / elapsed / 1e9;
   //double gflops = stencilGen.computeGFlops(elapsed);
   printValue("Actual GFlop/s", gflops);
