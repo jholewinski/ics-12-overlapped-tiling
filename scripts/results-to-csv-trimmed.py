@@ -19,26 +19,35 @@ for line in sys.stdin.readlines():
     runs[run][key] = value
 
     
-columns = [
-    'Arithmetic Intensity',
-    'Global Loads/Block',
-    'Global Stores/Block',
-    'Shared Loads/Block',
-    'Shared Stores/Block',
-    'Useful Ratio',
-    'Num Blocks (Shared)',
-    'Max Blocks',
-    'Actual GFlop/s']
 
-for col in columns:
-    sys.stdout.write('%s,' % col)
-sys.stdout.write('\n')
+
+sys.stdout.write('Arithmetic Intensity,Global Accesses,Shared Accesses,Useful FP Ratio,Global Trans Per Point,GFlop/s\n')
 
 for (run, values) in runs.iteritems():
-    sys.stdout.write('%s' % values[columns[0]])
-    for col in columns[1:]:
-        sys.stdout.write(',%s' % values[col])
-    sys.stdout.write('\n')
+    blockSizeX = int(values['Block Size X'])
+    blockSizeY = int(values['Block Size Y'])
+    numBlocksX = int(values['Num Blocks X'])
+    numBlocksY = int(values['Num Blocks Y'])
+    totalBlocks = numBlocksX * numBlocksY
+    gldPerBlock = int(values['Global Loads/Block'])
+    gstPerBlock = int(values['Global Stores/Block'])
+    sldPerBlock = int(values['Shared Loads/Block'])
+    sstPerBlock = int(values['Shared Stores/Block'])
+    
+    globalMemAccesses = (gldPerBlock+gstPerBlock)*totalBlocks
+    sharedMemAccesses = (sldPerBlock+sstPerBlock)*totalBlocks
+
+    globalTransPerPoint = (blockSizeX / 16) * blockSizeY
+
+    usefulFPRatio = float(values['Useful Ratio'])
+
+    sys.stdout.write('%s,%d,%d,%f,%d,%s\n' % 
+                     (values['Arithmetic Intensity'],
+                      globalMemAccesses,
+                      sharedMemAccesses,
+                      usefulFPRatio,
+                      globalTransPerPoint,
+                      values['Actual GFlop/s']))
 
 sys.stdout.flush()
 
