@@ -1,6 +1,4 @@
 
-opencl_headers = /opt/software/cuda/4.1rc1/cuda/include
-
 cxx = g++
 ar = ar
 
