@@ -442,7 +442,52 @@ int main(int argc,
     return 1;
   }
 
+  // Print some derived statistics
+  int32_t sharedSize = params.sharedSizeX * params.sharedSizeY * 1 * 4;
+  
+  int32_t numBlocksFromShared = (int32_t)std::ceil((double)localMemorySize /
+                                                   (double)sharedSize);
+  
+  int64_t totalFPPerBlock = params.blockSizeX * params.blockSizeY *
+    params.elementsPerThread * params.timeSteps * 15;
 
+  int64_t usefulFPPerBlock = 15 * params.realPerBlockX * params.realPerBlockY*
+    params.timeSteps;
+
+  double usefulFPRatio = (double)usefulFPPerBlock /
+    (double)totalFPPerBlock;
+
+  int32_t globalLoadsPerBlock = params.blockSizeX * params.blockSizeY *
+    params.elementsPerThread * 5;
+
+  int32_t globalStoresPerBlock = params.blockSizeX * params.blockSizeY *
+    params.elementsPerThread * 1;
+
+  int32_t sharedLoadsPerBlock = params.blockSizeX * params.blockSizeY *
+    params.elementsPerThread * 5 * (params.timeTileSize-1);
+
+  int32_t sharedStoresPerBlock = params.blockSizeX * params.blockSizeY *
+    params.elementsPerThread * 1 * (params.timeTileSize-1);
+
+  int32_t arithmeticIntensity = 15.0 / 5.0;
+
+  int32_t maxBlocks = 8;        // TODO: Change based on arch.
+  
+  printValue("Shared Size", sharedSize);
+  printValue("Num Blocks (Shared)", numBlocksFromShared);
+  printValue("Total FP", totalFPPerBlock);
+  printValue("Useful FP", usefulFPPerBlock);
+  printValue("Useful Ratio", usefulFPRatio);
+  printValue("Global Loads/Block", globalLoadsPerBlock);
+  printValue("Global Stores/Block", globalStoresPerBlock);
+  printValue("Shared Loads/Block", sharedLoadsPerBlock);
+  printValue("Shared Stores/Block", sharedStoresPerBlock);
+  printValue("Arithmetic Intensity", arithmeticIntensity);
+  printValue("Max Blocks", maxBlocks);
+
+
+
+  
   // Create a command queue.
   cl::CommandQueue queue(context.context(), context.device(), 0, &result);
   CLContext::throwOnError("cl::CommandQueue", result);
@@ -597,13 +642,13 @@ int main(int argc,
   printValue("Elapsed Time", elapsed);
 
   double gflops   = (double)params.realSize * (double)params.realSize
-    * 14.0 * (double)params.timeSteps / elapsed / 1e9;
+    * 15.0 * (double)params.timeSteps / elapsed / 1e9;
   //double gflops = stencilGen.computeGFlops(elapsed);
   printValue("Actual GFlop/s", gflops);
 
   gflops = (double)params.blockSizeX * (double)params.blockSizeY
     * (double)params.numBlocksX * (double)params.numBlocksY
-    * (double)params.elementsPerThread * 14.0 * (double)params.timeSteps
+    * (double)params.elementsPerThread * 15.0 * (double)params.timeSteps
     / elapsed / 1e9;
 
   printValue("Device GFlop/s", gflops);
