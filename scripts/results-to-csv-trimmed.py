@@ -21,7 +21,7 @@ for line in sys.stdin.readlines():
     
 
 
-sys.stdout.write('Arithmetic Intensity,Global Accesses,Shared Accesses,Useful FP Ratio,Global Trans Per Point,GFlop/s\n')
+sys.stdout.write('Useful FP Per Block,FP Per Global Access,Global Mem Accesses,Shared Mem Accesses,Actual GFlop/s\n')
 
 for (run, values) in runs.iteritems():
     blockSizeX = int(values['Block Size X'])
@@ -34,19 +34,24 @@ for (run, values) in runs.iteritems():
     sldPerBlock = int(values['Shared Loads/Block'])
     sstPerBlock = int(values['Shared Stores/Block'])
     
-    globalMemAccesses = (gldPerBlock+gstPerBlock)*totalBlocks
-    sharedMemAccesses = (sldPerBlock+sstPerBlock)*totalBlocks
+    usefulFPPerBlock = int(values['Useful FP'])
+    totalFPPerBlock = int(values['Total FP'])
+
+    globalMemAccesses = (gldPerBlock+gstPerBlock) # *totalBlocks
+    sharedMemAccesses = (sldPerBlock+sstPerBlock) # *totalBlocks
 
     globalTransPerPoint = (blockSizeX / 16) * blockSizeY
 
+    fpPerGlobalAccess = float(usefulFPPerBlock) / float(gldPerBlock+gstPerBlock)
+    allFPPerGlobalAccess = float(totalFPPerBlock) / float(gldPerBlock+gstPerBlock)
+
     usefulFPRatio = float(values['Useful Ratio'])
 
-    sys.stdout.write('%s,%d,%d,%f,%d,%s\n' % 
-                     (values['Arithmetic Intensity'],
+    sys.stdout.write('%d,%f,%d,%d,%s\n' % 
+                     (usefulFPPerBlock,
+                      fpPerGlobalAccess,
                       globalMemAccesses,
                       sharedMemAccesses,
-                      usefulFPRatio,
-                      globalTransPerPoint,
                       values['Actual GFlop/s']))
 
 sys.stdout.flush()
