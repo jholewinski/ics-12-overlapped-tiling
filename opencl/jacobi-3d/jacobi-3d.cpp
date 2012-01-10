@@ -79,8 +79,8 @@ struct GeneratorParams {
     realPerBlockX  = compsPerBlockX - 2*(timeTileSize-1);
     realPerBlockY  = compsPerBlockY - 2*(timeTileSize-1);
     realPerBlockZ  = compsPerBlockZ - 2*(timeTileSize-1);
-    sizeLCM        = boost::math::lcm(realPerBlockZ,
-                                      boost::math::lcm(realPerBlockX,
+    sizeLCM        = boost::math::gcd(realPerBlockZ,
+                                      boost::math::gcd(realPerBlockX,
                                                        realPerBlockY));
     realSize       = (problemSize / sizeLCM) * sizeLCM;
     numBlocksX     = realSize / realPerBlockX;

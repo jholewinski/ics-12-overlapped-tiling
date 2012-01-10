@@ -70,7 +70,7 @@ struct GeneratorParams {
     compsPerBlockY = blockSizeY*elementsPerThread;
     realPerBlockX  = compsPerBlockX - 2*(timeTileSize-1);
     realPerBlockY  = compsPerBlockY - 2*(timeTileSize-1);
-    sizeLCM        = boost::math::lcm(realPerBlockX, realPerBlockY);
+    sizeLCM        = boost::math::gcd(realPerBlockX, realPerBlockY);
     realSize       = (problemSize / sizeLCM) * sizeLCM;
     numBlocksX     = realSize / realPerBlockX;
     numBlocksY     = realSize / realPerBlockY;
@@ -84,12 +84,21 @@ struct GeneratorParams {
       fpSuffix = "";
     }
 
-    if(padding < 1 || compsPerBlockX < 1 || compsPerBlockY < 1               ||
+    /*if(padding < 1 || compsPerBlockX < 1 || compsPerBlockY < 1             ||
        realPerBlockX < 1 || realPerBlockY < 1 || sizeLCM < 1 || realSize < 1 ||
        numBlocksX < 1 || numBlocksY < 1 || sharedSizeX < 1                   ||
        sharedSizeY < 1 || paddedSize < 1) {
       throw std::runtime_error("Consistency error!");
-    }
+      }*/
+    assert(padding > 0);
+    assert(compsPerBlockX > 0);
+    assert(compsPerBlockY > 0);
+    assert(realPerBlockX > 0);
+    assert(realPerBlockY > 0);
+    assert(realSize > 0);
+    assert(numBlocksX > 0);
+    assert(numBlocksY > 0);
+    assert(paddedSize > 0);
   }
 };
 
