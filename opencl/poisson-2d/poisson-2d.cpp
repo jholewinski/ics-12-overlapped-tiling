@@ -70,13 +70,21 @@ struct GeneratorParams {
     compsPerBlockY = blockSizeY*elementsPerThread;
     realPerBlockX  = compsPerBlockX - 2*(timeTileSize-1);
     realPerBlockY  = compsPerBlockY - 2*(timeTileSize-1);
-    sizeLCM        = boost::math::gcd(realPerBlockX, realPerBlockY);
+    sizeLCM        = boost::math::lcm(realPerBlockX, realPerBlockY);
     realSize       = (problemSize / sizeLCM) * sizeLCM;
-    numBlocksX     = realSize / realPerBlockX;
-    numBlocksY     = realSize / realPerBlockY;
-    sharedSizeX    = blockSizeX + 2;
-    sharedSizeY    = blockSizeY * elementsPerThread + 2;
-    paddedSize     = realSize + 2*padding;
+
+    //realSize = problemSize;
+    
+    //if((realSize % realPerBlockX) != 0 ||
+    //   (realSize % realPerBlockY) != 0) {
+    //  throw std::runtime_error("Invalid parameter configuration");
+    //}
+    
+    numBlocksX  = realSize / realPerBlockX;
+    numBlocksY  = realSize / realPerBlockY;
+    sharedSizeX = blockSizeX + 2;
+    sharedSizeY = blockSizeY * elementsPerThread + 2;
+    paddedSize  = realSize + 2*padding;
 
     if(dataType == "float") {
       fpSuffix = "f";
@@ -84,6 +92,8 @@ struct GeneratorParams {
       fpSuffix = "";
     }
 
+    //std::cout << "SizeLCM: " << sizeLCM << "\n";
+    
     /*if(padding < 1 || compsPerBlockX < 1 || compsPerBlockY < 1             ||
        realPerBlockX < 1 || realPerBlockY < 1 || sizeLCM < 1 || realSize < 1 ||
        numBlocksX < 1 || numBlocksY < 1 || sharedSizeX < 1                   ||
