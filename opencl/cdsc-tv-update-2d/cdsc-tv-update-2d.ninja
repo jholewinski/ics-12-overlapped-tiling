@@ -1,0 +1,10 @@
+
+path = opencl/cdsc-tv-update-2d
+
+# Sources
+build $path/cdsc-tv-update-2d.o : cxx-build $path/cdsc-tv-update-2d.cpp
+
+# Executable
+build $bindir/ocl-cdsc-tv-update-2d : link-executable $path/cdsc-tv-update-2d.o $bindir/libclcommon.a
+  ldflags = $ldflags -lboost_program_options
+
