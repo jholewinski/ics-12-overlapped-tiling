@@ -395,6 +395,51 @@ int main(int argc,
   }
 
 
+  // Print some derived statistics
+  int32_t sharedSize = params.sharedSizeX * 1 * 4;
+  
+  int32_t numBlocksFromShared = (int32_t)std::ceil((double)localMemorySize /
+                                                   (double)sharedSize);
+  
+  int64_t totalFPPerBlock = params.blockSizeX * 
+    params.elementsPerThread * params.timeSteps * 3;
+
+  int64_t usefulFPPerBlock = 3 * params.realPerBlockX * 
+    params.timeSteps;
+
+  double usefulFPRatio = (double)usefulFPPerBlock /
+    (double)totalFPPerBlock;
+
+  int32_t globalLoadsPerBlock = params.blockSizeX * 
+    params.elementsPerThread * 3;
+
+  int32_t globalStoresPerBlock = params.blockSizeX * 
+    params.elementsPerThread * 1;
+
+  int32_t sharedLoadsPerBlock = params.blockSizeX * 
+    params.elementsPerThread * 3 * (params.timeTileSize-1);
+
+  int32_t sharedStoresPerBlock = params.blockSizeX * 
+    params.elementsPerThread * 1 * (params.timeTileSize-1);
+
+  int32_t arithmeticIntensity = 3.0 / 3.0;
+
+  int32_t maxBlocks = 8;        // TODO: Change based on arch.
+  
+  printValue("Shared Size", sharedSize);
+  printValue("Num Blocks (Shared)", numBlocksFromShared);
+  printValue("Total FP", totalFPPerBlock);
+  printValue("Useful FP", usefulFPPerBlock);
+  printValue("Useful Ratio", usefulFPRatio);
+  printValue("Global Loads/Block", globalLoadsPerBlock);
+  printValue("Global Stores/Block", globalStoresPerBlock);
+  printValue("Shared Loads/Block", sharedLoadsPerBlock);
+  printValue("Shared Stores/Block", sharedStoresPerBlock);
+  printValue("Arithmetic Intensity", arithmeticIntensity);
+  printValue("Max Blocks", maxBlocks);
+
+  
+
   // Create a command queue.
   cl::CommandQueue queue(context.context(), context.device(), 0, &result);
   CLContext::throwOnError("cl::CommandQueue", result);

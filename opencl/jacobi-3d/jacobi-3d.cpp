@@ -79,8 +79,8 @@ struct GeneratorParams {
     realPerBlockX  = compsPerBlockX - 2*(timeTileSize-1);
     realPerBlockY  = compsPerBlockY - 2*(timeTileSize-1);
     realPerBlockZ  = compsPerBlockZ - 2*(timeTileSize-1);
-    sizeLCM        = boost::math::gcd(realPerBlockZ,
-                                      boost::math::gcd(realPerBlockX,
+    sizeLCM        = boost::math::lcm(realPerBlockZ,
+                                      boost::math::lcm(realPerBlockX,
                                                        realPerBlockY));
     realSize       = (problemSize / sizeLCM) * sizeLCM;
     numBlocksX     = realSize / realPerBlockX;
@@ -500,6 +500,49 @@ int main(int argc,
     return 1;
   }
 
+  // Print some derived statistics
+  int32_t sharedSize = params.sharedSizeX * params.sharedSizeY * params.sharedSizeZ * 1 * 4;
+  
+  int32_t numBlocksFromShared = (int32_t)std::ceil((double)localMemorySize /
+                                                   (double)sharedSize);
+  
+  int64_t totalFPPerBlock = params.blockSizeX * params.blockSizeY * params.blockSizeZ *
+    params.elementsPerThread * params.timeSteps * 7;
+
+  int64_t usefulFPPerBlock = 7 * params.realPerBlockX * params.realPerBlockY *
+    params.realPerBlockZ * params.timeSteps;
+
+  double usefulFPRatio = (double)usefulFPPerBlock /
+    (double)totalFPPerBlock;
+
+  int32_t globalLoadsPerBlock = params.blockSizeX * params.blockSizeY *
+    params.blockSizeZ * params.elementsPerThread * 7;
+
+  int32_t globalStoresPerBlock = params.blockSizeX * params.blockSizeY *
+    params.blockSizeZ * params.elementsPerThread * 1;
+
+  int32_t sharedLoadsPerBlock = params.blockSizeX * params.blockSizeY *
+    params.blockSizeZ * params.elementsPerThread * 7 * (params.timeTileSize-1);
+
+  int32_t sharedStoresPerBlock = params.blockSizeX * params.blockSizeY *
+    params.blockSizeZ * params.elementsPerThread * 1 * (params.timeTileSize-1);
+
+  int32_t arithmeticIntensity = 7.0 / 7.0;
+
+  int32_t maxBlocks = 8;        // TODO: Change based on arch.
+  
+  printValue("Shared Size", sharedSize);
+  printValue("Num Blocks (Shared)", numBlocksFromShared);
+  printValue("Total FP", totalFPPerBlock);
+  printValue("Useful FP", usefulFPPerBlock);
+  printValue("Useful Ratio", usefulFPRatio);
+  printValue("Global Loads/Block", globalLoadsPerBlock);
+  printValue("Global Stores/Block", globalStoresPerBlock);
+  printValue("Shared Loads/Block", sharedLoadsPerBlock);
+  printValue("Shared Stores/Block", sharedStoresPerBlock);
+  printValue("Arithmetic Intensity", arithmeticIntensity);
+  printValue("Max Blocks", maxBlocks);
+  
 
   // Create a command queue.
   cl::CommandQueue queue(context.context(), context.device(), 0, &result);
