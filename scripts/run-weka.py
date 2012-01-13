@@ -17,11 +17,16 @@ benchmarks = [
 ]
 
 block_sizes = [
-#    [16, 8],
-#    [32, 8],
-#    [48, 8],
-#    [64, 8],
-#    [80, 8],
+    [16, 8],
+    [32, 8],
+    [48, 8],
+    [64, 8],
+    [80, 8],
+    [16, 4],
+    [32, 4],
+    [48, 4],
+    [64, 4],
+    [80, 4]
 
 #    [96, 4],
 #    [32, 12],
@@ -30,12 +35,12 @@ block_sizes = [
 
 #    [64, 4]
 
-    [96, 4],
-    [64, 4],
-    [128, 8],
-    [32, 4],
-    [128, 1],
-    [16, 10, 2]
+#    [96, 4],
+#    [64, 4],
+#    [128, 8],
+#    [32, 4],
+#    [128, 1],
+#    [16, 10, 2]
 ]
 
 
@@ -102,7 +107,7 @@ for left_out in benchmarks:
 
     # Build the model
     args = ['java', '-cp', options.jar, options.classifier, '-t',
-            'training.csv', '-d', 'testing.model']
+            'training.csv', '-d', 'testing.model', '-no-cv']
     subprocess.call(args, stdout=weka_log, stderr=weka_log)
 
     # Build the test data
