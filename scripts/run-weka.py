@@ -7,7 +7,9 @@ import sys
 
 
 benchmarks = [
+    'jacobi-1d',
     'jacobi-2d',
+    'jacobi-3d',
     'gradient-2d',
     'fdtd-2d',
     'poisson-2d',
@@ -69,7 +71,7 @@ for left_out in benchmarks:
     for trainer in remaining:
         if options.train_all:
             data = open('%s-scaling.%s.csv' % (trainer, options.device))
-            args = ['../scripts/extract-features.py']
+            args = ['../../scripts/extract-features.py']
             if first:
                 args.append('-p')
                 first=False
@@ -78,7 +80,7 @@ for left_out in benchmarks:
         else:
             for bs in block_sizes:
                 data = open('%s-scaling.%s.csv' % (trainer, options.device))
-                args = ['../scripts/extract-features.py']
+                args = ['../../scripts/extract-features.py']
                 args.append('-x')
                 args.append(str(bs[0]))
                 args.append('-y')
@@ -101,7 +103,7 @@ for left_out in benchmarks:
 
     first = True
     if options.test_all:
-        args = ['../scripts/extract-features.py']
+        args = ['../../scripts/extract-features.py']
         if first:
             args.append('-p')
             first = False
@@ -110,7 +112,7 @@ for left_out in benchmarks:
         data.close()
     else:
         for bs in block_sizes:
-            args = ['../scripts/extract-features.py']
+            args = ['../../scripts/extract-features.py']
             args.append('-x')
             args.append(str(bs[0]))
             args.append('-y')
@@ -129,7 +131,7 @@ for left_out in benchmarks:
             'test.csv', '-l', 'testing.model', '-p', '0']
     proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    args = ['../scripts/parse-weka-results.py']
+    args = ['../../scripts/parse-weka-results.py']
     subprocess.call(args, stdin=proc.stdout)
 
    

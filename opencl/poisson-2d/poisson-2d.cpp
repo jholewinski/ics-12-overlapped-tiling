@@ -277,13 +277,13 @@ void Poisson2DGenerator::generateCompute(std::ostream& stream,
              << " tl, tc, tr, ml, mc, mr, bl, bc, br;\n";
 
       stream << "    tl = buffer[get_local_id(1)*" << params.elementsPerThread
-             << "+" << (i-1)
+             << "+" << i
              << "+0][get_local_id(0)+0];\n";
       stream << "    tc = buffer[get_local_id(1)*" << params.elementsPerThread
-             << "+" << (i-1)
+             << "+" << i
              << "+0][get_local_id(0)+1];\n";
       stream << "    tr = buffer[get_local_id(1)*" << params.elementsPerThread
-             << "+" << (i-1)
+             << "+" << i
              << "+0][get_local_id(0)+2];\n";
 
       stream << "    ml = buffer[get_local_id(1)*" << params.elementsPerThread
@@ -295,13 +295,13 @@ void Poisson2DGenerator::generateCompute(std::ostream& stream,
              << "+1][get_local_id(0)+2];\n";
 
       stream << "    bl = buffer[get_local_id(1)*" << params.elementsPerThread
-             << "+" << (i-1)
+             << "+" << i
              << "+2][get_local_id(0)+0];\n";
       stream << "    bc = buffer[get_local_id(1)*" << params.elementsPerThread
-             << "+" << (i-1)
+             << "+" << i
              << "+2][get_local_id(0)+1];\n";
       stream << "    br = buffer[get_local_id(1)*" << params.elementsPerThread
-             << "+" << (i-1)
+             << "+" << i
              << "+2][get_local_id(0)+2];\n";
 
       stream << "    " << params.dataType
