@@ -8,6 +8,8 @@ import sys
 
 benchmarks = [
     'jacobi-1d',
+    'jacobi-1d-5pt',
+    'jacobi-1d-7pt',
     'jacobi-2d',
     'jacobi-3d',
     'poisson-2d',

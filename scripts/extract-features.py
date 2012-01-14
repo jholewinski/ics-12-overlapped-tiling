@@ -51,6 +51,7 @@ if options.header:
     sys.stdout.write('num_blocks_x,')
     sys.stdout.write('num_blocks_y,')
     sys.stdout.write('num_blocks_z,')
+    sys.stdout.write('glb_trans_per_block,')
     sys.stdout.write('num_arrays,')
     sys.stdout.write('actual_gflops\n')
 
@@ -150,6 +151,8 @@ for line in sys.stdin.readlines():
     sys.stdout.write(str(num_blocks_y))
     sys.stdout.write(',')
     sys.stdout.write(str(num_blocks_z))
+    sys.stdout.write(',')
+    sys.stdout.write(str(glb_trans_per_block))
     sys.stdout.write(',')
 
  
