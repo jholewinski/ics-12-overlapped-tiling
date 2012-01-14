@@ -210,7 +210,7 @@ void Jacobi1DGenerator::generateCompute(std::ostream& stream,
     stream << "    result = (valid" << i << ") ? result : 0.0"
            << params.fpSuffix << ";\n";
     stream << "    buffer[get_local_id(0)+" << (i*params.blockSizeX)
-           << "+1] = result;\n";
+           << "+2] = result;\n";
     stream << "    local" << i << " = result;\n";
     stream << "  }\n";
   }
@@ -224,15 +224,15 @@ void Jacobi1DGenerator::generateCompute(std::ostream& stream,
       stream << "    " << params.dataType
              << " val0, val1, val2, val3, val4;\n";
       stream << "    val0 = buffer[get_local_id(0)+" << (i*params.blockSizeX)
-             << "-1];\n";
-      stream << "    val1 = buffer[get_local_id(0)+" << (i*params.blockSizeX)
              << "+0];\n";
+      stream << "    val1 = buffer[get_local_id(0)+" << (i*params.blockSizeX)
+             << "+1];\n";
       stream << "    val2 = buffer[get_local_id(0)+" << (i*params.blockSizeX)
-             << "+1];\n";      
-      stream << "    val3 = buffer[get_local_id(0)+" << (i*params.blockSizeX)
              << "+2];\n";      
-      stream << "    val4 = buffer[get_local_id(0)+" << (i*params.blockSizeX)
+      stream << "    val3 = buffer[get_local_id(0)+" << (i*params.blockSizeX)
              << "+3];\n";      
+      stream << "    val4 = buffer[get_local_id(0)+" << (i*params.blockSizeX)
+             << "+4];\n";      
       stream << "    " << params.dataType
              << " result = 0.2" << params.fpSuffix
              << " * (val0+val1+val2+val3+val4);\n";
@@ -244,7 +244,7 @@ void Jacobi1DGenerator::generateCompute(std::ostream& stream,
     stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
     for(int32_t i = 0; i < params.elementsPerThread; ++i) {
       stream << "  buffer[get_local_id(0)+" << (i*params.blockSizeX)
-             << "+1] = new" << i << ";\n";
+             << "+2] = new" << i << ";\n";
       stream << "  local" << i << " = new" << i << ";\n";
     }
     stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
