@@ -10,10 +10,10 @@ benchmarks = [
     'jacobi-1d',
     'jacobi-2d',
     'jacobi-3d',
-    'gradient-2d',
-    'fdtd-2d',
     'poisson-2d',
-    'rician-2d'
+    'fdtd-2d',
+    'rician-2d',
+    'gradient-2d'
 ]
 
 block_sizes = [

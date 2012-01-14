@@ -11,6 +11,7 @@ subninja $path/cdsc-tv-update-2d/cdsc-tv-update-2d.ninja
 subninja $path/fdtd-2d/fdtd-2d.ninja
 subninja $path/gradient-2d/gradient-2d.ninja
 subninja $path/jacobi-1d/jacobi-1d.ninja
+subninja $path/jacobi-1d-5pt/jacobi-1d-5pt.ninja
 subninja $path/jacobi-2d/jacobi-2d.ninja
 subninja $path/jacobi-3d/jacobi-3d.ninja
 subninja $path/poisson-2d/poisson-2d.ninja

@@ -1,0 +1,10 @@
+
+path = opencl/jacobi-1d-5pt
+
+# Sources
+build $path/jacobi-1d-5pt.o : cxx-build $path/jacobi-1d-5pt.cpp
+
+# Executable
+build $bindir/ocl-jacobi-1d-5pt : link-executable $path/jacobi-1d-5pt.o $bindir/libclcommon.a
+  ldflags = $ldflags -lboost_program_options
+
