@@ -52,6 +52,7 @@ if options.header:
     sys.stdout.write('num_blocks_y,')
     sys.stdout.write('num_blocks_z,')
     sys.stdout.write('glb_trans_per_block,')
+    sys.stdout.write('arith_inten,')
     sys.stdout.write('num_arrays,')
     sys.stdout.write('actual_gflops\n')
 
@@ -59,6 +60,7 @@ for line in sys.stdin.readlines():
     columns = line.strip().split(',')
     data = dict(zip(headers, columns))
     
+
     total_fp = int(data['Total FP'])
     elem_per_thread = int(data['Elements/Thread'])
     gld_per_block = int(data['Global Loads/Block'])
@@ -74,6 +76,7 @@ for line in sys.stdin.readlines():
     actual_gflops = float(data['Actual GFlop/s'])
     ops_per_load = float(data['ops_per_load'])
     dimensionality = float(data['dimensionality'])
+    arith_inten = float(data['Arithmetic Intensity'])
     num_blocks_x = int(data['Num Blocks X'])
 
     if 'Block Size Y' not in data:
@@ -153,6 +156,8 @@ for line in sys.stdin.readlines():
     sys.stdout.write(str(num_blocks_z))
     sys.stdout.write(',')
     sys.stdout.write(str(glb_trans_per_block))
+    sys.stdout.write(',')
+    sys.stdout.write(str(arith_inten))
     sys.stdout.write(',')
 
  
