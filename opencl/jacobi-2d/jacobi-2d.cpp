@@ -41,7 +41,8 @@ struct GeneratorParams {
   int32_t     numBlocksX;
   int32_t     numBlocksY;
   std::string fpSuffix;
-  
+
+  bool breakThreads;
   
 
   /**
@@ -53,12 +54,14 @@ struct GeneratorParams {
                   int32_t bsy      = 16,
                   int32_t ps       = 1024,
                   int32_t ts       = 64,
+                  bool    bt       = false,
                   std::string type = "float")
     : timeTileSize(tts),
       timeSteps(ts),
       elementsPerThread(ept),
       problemSize(ps),
       dataType(type),
+      breakThreads(bt),
       blockSizeX(bsx),
       blockSizeY(bsy) {
   }
@@ -77,6 +80,10 @@ struct GeneratorParams {
     sharedSizeX    = blockSizeX + 2;
     sharedSizeY    = blockSizeY * elementsPerThread + 2;
     paddedSize     = realSize + 2*padding;
+
+    // Make sure padded size is a multiple of 32 floats
+    int32_t rem  = paddedSize % 32;
+    paddedSize  += 32 - rem;
 
     if(dataType == "float") {
       fpSuffix = "f";
@@ -194,6 +201,7 @@ void Jacobi2DGenerator::generateLocals(std::ostream& stream,
            << (params.realSize+params.padding) << ";\n";
   }
 
+  if(!params.breakThreads) {
   stream << "  bool writeValidX = get_local_id(0) >= "
          << (params.timeTileSize-1)
          << " && get_local_id(0) < "
@@ -206,6 +214,7 @@ void Jacobi2DGenerator::generateLocals(std::ostream& stream,
     stream << "  bool writeValid" << i << " = effectiveTidY >= "
            << params.timeTileSize-1 << " && effectiveTidY < "
            << (params.realPerBlockY+params.timeTileSize-1) << ";\n";
+  }
   }
 
   // Declare local intermediates
@@ -252,7 +261,19 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
 
   for(int32_t t = 1; t < params.timeTileSize; ++t) {
     stream << "  // Time Step " << t << "\n";
+    if(params.breakThreads) {
+      stream << "  if(get_local_id(0) >= " << t
+             << " && get_local_id(0) < get_local_size(0)-"
+             << t << ")\n";
+    }
+    stream << "  {\n";
     for(int32_t i = 0; i < params.elementsPerThread; ++i) {
+      if(params.breakThreads) {
+        stream << "  if(get_local_id(1)*" << params.elementsPerThread << "+" << i
+               << " >= " << t << " && get_local_id(1)*"
+               << params.elementsPerThread << "+" << i << " < get_local_size(1)*"
+               << params.elementsPerThread << "-" << t << ")\n";
+      }
       stream << "  {\n";
       stream << "    " << params.dataType << " val0, val1, val2, val3, val4;\n";
       stream << "    // Left\n";
@@ -280,6 +301,10 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
              << params.fpSuffix << ";\n";
       stream << "    new" << i << " = result;\n";
       stream << "  }\n";
+      if(params.breakThreads) {
+        //stream << "  else { return; }\n";
+        stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
+      }
     }
     stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
     for(int32_t i = 0; i < params.elementsPerThread; ++i) {
@@ -289,9 +314,16 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
       stream << "  local" << i << " = new" << i << ";\n";
     }
     stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
+    stream << "  }\n";
+    if(params.breakThreads) {
+      stream << "else { return; }\n";
+    }
   }
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
-    stream << "  if(writeValid" << i << " && writeValidX) {\n";
+    if(!params.breakThreads) {
+      stream << "  if(writeValid" << i << " && writeValidX)\n";
+    }
+    stream << "  {\n";
     stream << "    *(outputPtr+(" << params.paddedSize << "*" << i
            << ")) = local" << i << ";\n";
     stream << "  }\n";
@@ -375,6 +407,7 @@ int main(int argc,
      po::value<std::string>(&saveKernelFile)->default_value(""),
      "Save kernel to disk")
     ("verify,v", "Verify results")
+    ("break-threads,b", "Break threads")
     ;
 
   po::variables_map vm;
@@ -384,6 +417,10 @@ int main(int argc,
   if(vm.count("help")) {
     std::cerr << desc;
     return 1;
+  }
+
+  if(vm.count("break-threads")) {
+    params.breakThreads = true;
   }
 
   std::string kernelSource;
