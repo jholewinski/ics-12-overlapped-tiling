@@ -1,0 +1,10 @@
+
+path = opencl/jacobi-2d-tex
+
+# Sources
+build $path/jacobi-2d-tex.o : cxx-build $path/jacobi-2d-tex.cpp
+
+# Executable
+build $bindir/ocl-jacobi-2d-tex : link-executable $path/jacobi-2d-tex.o $bindir/libclcommon.a
+  ldflags = $ldflags -lboost_program_options
+

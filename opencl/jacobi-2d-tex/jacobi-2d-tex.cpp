@@ -159,7 +159,8 @@ void Jacobi2DGenerator::generateHeader(std::ostream& stream,
                                        const GeneratorParams& params) {
   stream << "/* Auto-generated.  Do not edit by hand. */\n";
   stream << "__kernel\n";
-  stream << "void kernel_func(__global " << params.dataType << "* input,\n";
+  stream << "void kernel_func(__read_only image2d_t inputTex,\n";
+  stream << "                 sampler_t sampler,\n";
   stream << "                 __global " << params.dataType << "* output) {\n";
 }
 
@@ -173,11 +174,15 @@ void Jacobi2DGenerator::generateLocals(std::ostream& stream,
          << "][" << params.sharedSizeX << "];\n";
 
   // Compute some pointer values
-  stream << "  __global " << params.dataType
-         << "* inputPtr = input + ((get_group_id(1)*" << params.realPerBlockY
-         << "+get_local_id(1)*" << params.elementsPerThread << "+1)*"
-         << params.paddedSize << ") + (get_group_id(0)*" << params.realPerBlockX
-         << ") + get_local_id(0) + 1;\n";
+  //stream << "  __global " << params.dataType
+  //       << "* inputPtr = input + ((get_group_id(1)*" << params.realPerBlockY
+  //       << "+get_local_id(1)*" << params.elementsPerThread << "+1)*"
+  //       << params.paddedSize << ") + (get_group_id(0)*" << params.realPerBlockX
+  //       << ") + get_local_id(0) + 1;\n";
+  stream << "int myY = get_group_id(1)*" << params.realPerBlockY
+         << "+get_local_id(1)*" << params.elementsPerThread << "+1;\n";
+  stream << "int myX = get_group_id(0)*" << params.realPerBlockX
+         << " + get_local_id(0) + 1;\n";
 
   stream << "  __global " << params.dataType
          << "* outputPtr = output + ((get_group_id(1)*" << params.realPerBlockY
@@ -186,18 +191,18 @@ void Jacobi2DGenerator::generateLocals(std::ostream& stream,
          << ") + get_local_id(0) + 1;\n";
 
   // Compute some guards
-  stream << "  int globalIndexX = (get_group_id(0)*" << params.realPerBlockX
-         << ") + get_local_id(0) + 1;\n";
-  stream << "  int globalIndexY;\n";
-  stream << "  bool validX = globalIndexX >= " << params.padding
-         << " && globalIndexX < " << (params.realSize+params.padding) << ";\n";
+  //stream << "  int globalIndexX = (get_group_id(0)*" << params.realPerBlockX
+  //       << ") + get_local_id(0) + 1;\n";
+  //stream << "  int globalIndexY;\n";
+  stream << "  bool validX = myX >= " << params.padding
+         << " && myX < " << (params.realSize+params.padding) << ";\n";
 
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
-    stream << "  globalIndexY = get_group_id(1)*" << params.realPerBlockY
-           << " + " << params.elementsPerThread << "*get_local_id(1) + " << i
-           << " + 1;\n";
-    stream << "  bool valid" << i << " = validX && globalIndexY >= "
-           << params.padding << " && globalIndexY < "
+    //stream << "  globalIndexY = get_group_id(1)*" << params.realPerBlockY
+    //       << " + " << params.elementsPerThread << "*get_local_id(1) + " << i
+    //       << " + 1;\n";
+    stream << "  bool valid" << i << " = validX && myY >= "
+           << params.padding << " && myY < "
            << (params.realSize+params.padding) << ";\n";
   }
 
@@ -230,21 +235,43 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  {\n";
     stream << "    " << params.dataType << " val0, val1, val2, val3, val4;\n";
+    stream << "    float u, v;\n";
     stream << "    // Left\n";
-    stream << "    val0 = *(inputPtr+(" << params.paddedSize << "*" << i
-           << ")-1);\n";
+    //stream << "    val0 = *(inputPtr+(" << params.paddedSize << "*" << i
+    //       << ")-1);\n";
+    stream << "    u = myX-1; v = myY;\n";
+    stream << "    u /= " << params.paddedSize << ".0" << params.fpSuffix << ";\n";
+    stream << "    v /= " << params.paddedSize << ".0" << params.fpSuffix << ";\n";
+    stream << "    val0 = read_imagef(inputTex, sampler, (float2)(u,v)).x;\n";
     stream << "    // Center\n";
-    stream << "    val1 = *(inputPtr+(" << params.paddedSize << "*" << i
-           << "));\n";
+
+    //stream << "    val1 = *(inputPtr+(" << params.paddedSize << "*" << i
+    //       << "));\n";
+    stream << "    u = myX; v = myY;\n";
+    stream << "    u /= " << params.paddedSize << ".0" << params.fpSuffix << ";\n";
+    stream << "    v /= " << params.paddedSize << ".0" << params.fpSuffix << ";\n";
+    stream << "    val1 = read_imagef(inputTex, sampler, (float2)(u,v)).x;\n";
     stream << "    // Right\n";
-    stream << "    val2 = *(inputPtr+(" << params.paddedSize << "*" << i
-           << ")+1);\n";
+    //stream << "    val2 = *(inputPtr+(" << params.paddedSize << "*" << i
+    //       << ")+1);\n";
+    stream << "    u = myX+1; v = myY;\n";
+    stream << "    u /= " << params.paddedSize << ".0" << params.fpSuffix << ";\n";
+    stream << "    v /= " << params.paddedSize << ".0" << params.fpSuffix << ";\n";
+    stream << "    val2 = read_imagef(inputTex, sampler, (float2)(u,v)).x;\n";
     stream << "    // Top\n";
-    stream << "    val3 = *(inputPtr+(" << params.paddedSize << "*" << (i-1)
-           << "));\n";
+    //stream << "    val3 = *(inputPtr+(" << params.paddedSize << "*" << (i-1)
+    //       << "));\n";
+    stream << "    u = myX; v = myY+1;\n";
+    stream << "    u /= " << params.paddedSize << ".0" << params.fpSuffix << ";\n";
+    stream << "    v /= " << params.paddedSize << ".0" << params.fpSuffix << ";\n";
+    stream << "    val3 = read_imagef(inputTex, sampler, (float2)(u,v)).x;\n";
     stream << "    // Bottom\n";
-    stream << "    val4 = *(inputPtr+(" << params.paddedSize << "*" << (i+1)
-           << "));\n";
+    //stream << "    val4 = *(inputPtr+(" << params.paddedSize << "*" << (i+1)
+    //       << "));\n";
+    stream << "    u = myX; v = myY-1;\n";
+    stream << "    u /= " << params.paddedSize << ".0" << params.fpSuffix << ";\n";
+    stream << "    v /= " << params.paddedSize << ".0" << params.fpSuffix << ";\n";
+    stream << "    val4 = read_imagef(inputTex, sampler, (float2)(u,v)).x;\n";
     stream << "    " << params.dataType
            << " result = 0.2" << params.fpSuffix
            << " * (val0+val1+val2+val3+val4);\n";
@@ -408,6 +435,7 @@ int main(int argc,
      "Save kernel to disk")
     ("verify,v", "Verify results")
     ("break-threads,b", "Break threads")
+    ("output-results,o", "Output results")
     ;
 
   po::variables_map vm;
@@ -627,6 +655,20 @@ int main(int argc,
                                     NULL, NULL);
   CLContext::throwOnError("Failed to copy input data to device", result);
 
+
+  // Create image object
+  cl::ImageFormat format(CL_R, CL_FLOAT);
+  cl::Image2D     deviceTex(context.context(), CL_MEM_READ_ONLY, format,
+                            params.paddedSize, params.paddedSize, 0, NULL,
+                            &result);
+  CLContext::throwOnError("Failed to create texture", result);
+
+  cl::Sampler sampler(context.context(), CL_TRUE, CL_ADDRESS_CLAMP,
+                      CL_FILTER_NEAREST, &result);
+  CLContext::throwOnError("Failed to create sampler", result);
+  
+  
+  
   cl::NDRange globalSize(params.blockSizeX*params.numBlocksX,
                          params.blockSizeY*params.numBlocksY);
   cl::NDRange localSize(params.blockSizeX, params.blockSizeY);
@@ -644,10 +686,24 @@ int main(int argc,
 
   for(int t = 0; t < params.timeSteps / params.timeTileSize; ++t) {
 
+    // Copy input buffer to image
+    cl::size_t<3> dest;
+    dest[0]   = 0;
+    dest[1]   = 0;
+    dest[2]   = 0;
+    cl::size_t<3> region;
+    region[0] = params.paddedSize;
+    region[1] = params.paddedSize;
+    region[2] = 1;
+    result    = queue.enqueueCopyBufferToImage(*inputBuffer, deviceTex, 0, dest, region);
+    CLContext::throwOnError("Failed to copy input data to texture", result);
+    
     // Set kernel arguments
-    result = kernel.setArg(0, *inputBuffer);
+    result = kernel.setArg(0, deviceTex);
     CLContext::throwOnError("Failed to set input parameter", result);
-    result = kernel.setArg(1, *outputBuffer);
+    result = kernel.setArg(1, sampler);
+    CLContext::throwOnError("Failed to set input parameter", result);
+    result = kernel.setArg(2, *outputBuffer);
     CLContext::throwOnError("Failed to set output parameter", result);
   
     // Invoke the kernel
@@ -688,6 +744,25 @@ int main(int argc,
     compareResults(reference, hostData, params);
   }
 
+
+  if(vm.count("output-results")) {
+    std::cerr << "---- GPU Output ----\n";
+    for(int32_t i = 0; i < params.paddedSize; ++i) {
+      for(int32_t j = 0; j < params.paddedSize; ++j) {
+        std::cerr << hostData[i*params.paddedSize+j] << " ";
+      }
+      std::cerr << "\n";
+    }
+    if(vm.count("verify")) {
+      std::cerr << "---- Reference ----\n";
+      for(int32_t i = 0; i < params.paddedSize; ++i) {
+        for(int32_t j = 0; j < params.paddedSize; ++j) {
+          std::cerr << reference[i*params.paddedSize+j] << " ";
+        }
+        std::cerr << "\n";
+      }
+    }
+  }
 
 
   // Clean-up

@@ -14,6 +14,7 @@ subninja $path/jacobi-1d/jacobi-1d.ninja
 subninja $path/jacobi-1d-5pt/jacobi-1d-5pt.ninja
 subninja $path/jacobi-1d-7pt/jacobi-1d-7pt.ninja
 subninja $path/jacobi-2d/jacobi-2d.ninja
+subninja $path/jacobi-2d-tex/jacobi-2d-tex.ninja
 subninja $path/jacobi-3d/jacobi-3d.ninja
 subninja $path/poisson-2d/poisson-2d.ninja
 subninja $path/rician-denoise-2d/rician-denoise-2d.ninja
