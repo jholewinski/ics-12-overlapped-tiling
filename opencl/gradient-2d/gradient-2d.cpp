@@ -9,6 +9,7 @@
 
 #include <boost/math/common_factor.hpp>
 #include <boost/program_options.hpp>
+#include <boost/regex.hpp>
 
 using namespace ot;
 
@@ -26,7 +27,7 @@ struct GeneratorParams {
   int32_t     blockSizeY;
   int32_t     problemSize;
   std::string dataType;
-  
+
   // Derived
   int32_t     padding;
   int32_t     compsPerBlockX;
@@ -41,8 +42,8 @@ struct GeneratorParams {
   int32_t     numBlocksX;
   int32_t     numBlocksY;
   std::string fpSuffix;
-  
-  
+
+
 
   /**
    * Default constructor.
@@ -109,9 +110,9 @@ private:
 
   void generateHeader(std::ostream&          stream,
                       const GeneratorParams& params);
-  
+
   void generateFooter(std::ostream& stream);
-  
+
   void generateLocals(std::ostream&          stream,
                       const GeneratorParams& params);
 
@@ -130,7 +131,7 @@ std::string Gradient2DGenerator::generate(GeneratorParams& params) {
   std::stringstream program;
 
   params.computeDerived();
-  
+
   generateHeader(program, params);
   generateLocals(program, params);
   generateCompute(program, params);
@@ -191,7 +192,7 @@ void Gradient2DGenerator::generateLocals(std::ostream& stream,
          << " && get_local_id(0) < "
          << (params.realPerBlockX+params.timeTileSize-1) << ";\n";
   stream << "  int effectiveTidY;\n";
-  
+
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  effectiveTidY = get_local_id(1)*" << params.elementsPerThread
            << " + " << i << ";\n";
@@ -296,30 +297,30 @@ void Gradient2DGenerator::generateCompute(std::ostream& stream,
 
 
 void compareResults(float* host, float* device, const GeneratorParams& params) {
-  
+
   double errorNorm, refNorm, diff;
   errorNorm = 0.0;
   refNorm   = 0.0;
 
   for(int i = params.padding; i < params.paddedSize-params.padding; ++i) {
     for(int j = params.padding; j < params.paddedSize-params.padding; ++j) {
-      
+
       float h = host[i*params.paddedSize + j];
       float d = device[i*params.paddedSize + j];
-      
+
       diff       = h - d;
       //      std::cout << "h: " << h << "  d: " << d << "  diff: " << diff << "\n";
       errorNorm += diff*diff;
       refNorm   += h*h;
     }
   }
-  
+
   errorNorm = std::sqrt(errorNorm);
   refNorm = std::sqrt(refNorm);
 
   printValue("Error Norm", errorNorm);
   printValue("Ref Norm", refNorm);
-  
+
   if(std::abs(refNorm) < 1e-7) {
     printValue("Correctness", "FAILED");
   }
@@ -337,9 +338,9 @@ int main(int argc,
   cl_int      result;
   std::string kernelFile;
   std::string saveKernelFile;
-  
+
   srand(123456);
- 
+
   Gradient2DGenerator gen;
   GeneratorParams     params;
 
@@ -383,7 +384,7 @@ int main(int argc,
   }
 
   std::string kernelSource;
-  
+
   if(kernelFile.size() == 0) {
     kernelSource = gen.generate(params);
   } else {
@@ -400,18 +401,18 @@ int main(int argc,
     kernelStream.close();
   }
 
-  printValue("Problem Size", params.problemSize);
-  printValue("Time Tile Size", params.timeTileSize);
-  printValue("Padded Size", params.paddedSize);
-  printValue("Block Size X", params.blockSizeX);
-  printValue("Block Size Y", params.blockSizeY);
-  printValue("Elements/Thread", params.elementsPerThread);
-  printValue("Num Blocks X", params.numBlocksX);
-  printValue("Num Blocks Y", params.numBlocksY);
-  printValue("Time Steps", params.timeSteps);
-  printValue("Padding", params.padding);
-  printValue("Real Size", params.realSize);
-  
+  // printValue("Problem Size", params.problemSize);
+  // printValue("Time Tile Size", params.timeTileSize);
+  // printValue("Padded Size", params.paddedSize);
+  // printValue("Block Size X", params.blockSizeX);
+  // printValue("Block Size Y", params.blockSizeY);
+  // printValue("Elements/Thread", params.elementsPerThread);
+  // printValue("Num Blocks X", params.numBlocksX);
+  // printValue("Num Blocks Y", params.numBlocksY);
+  // printValue("Time Steps", params.timeSteps);
+  // printValue("Padding", params.padding);
+  // printValue("Real Size", params.realSize);
+
   int arraySize = params.paddedSize * params.paddedSize * sizeof(float);
 
   CLContext context;
@@ -427,10 +428,10 @@ int main(int argc,
     .getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>();
 
   // Print device information.
-  printValue("Global Memory Size", globalMemorySize);
-  printValue("Local Memory Size", localMemorySize);
-  printValue("Max Compute Units", maxComputeUnits);
-  printValue("Max Work-Group Size", maxWorkGroupSize);
+  // printValue("Global Memory Size", globalMemorySize);
+  // printValue("Local Memory Size", localMemorySize);
+  // printValue("Max Compute Units", maxComputeUnits);
+  // printValue("Max Work-Group Size", maxWorkGroupSize);
 
   if(params.blockSizeX*params.blockSizeY > maxWorkGroupSize) {
     std::cout << "ERROR: Block dimensions are too large!\n";
@@ -444,10 +445,10 @@ int main(int argc,
 
   // Print some derived statistics
   int32_t sharedSize = params.sharedSizeX * params.sharedSizeY * 1 * 4;
-  
+
   int32_t numBlocksFromShared = (int32_t)std::ceil((double)localMemorySize /
                                                    (double)sharedSize);
-  
+
   int64_t totalFPPerBlock = params.blockSizeX * params.blockSizeY *
     params.elementsPerThread * params.timeSteps * 15;
 
@@ -472,26 +473,28 @@ int main(int argc,
   int32_t arithmeticIntensity = 15.0 / 5.0;
 
   int32_t maxBlocks = 8;        // TODO: Change based on arch.
-  
-  printValue("Shared Size", sharedSize);
-  printValue("Num Blocks (Shared)", numBlocksFromShared);
-  printValue("Total FP", totalFPPerBlock);
-  printValue("Useful FP", usefulFPPerBlock);
-  printValue("Useful Ratio", usefulFPRatio);
-  printValue("Global Loads/Block", globalLoadsPerBlock);
-  printValue("Global Stores/Block", globalStoresPerBlock);
-  printValue("Shared Loads/Block", sharedLoadsPerBlock);
-  printValue("Shared Stores/Block", sharedStoresPerBlock);
-  printValue("Arithmetic Intensity", arithmeticIntensity);
-  printValue("Max Blocks", maxBlocks);
+
+  // printValue("Shared Size", sharedSize);
+  // printValue("Num Blocks (Shared)", numBlocksFromShared);
+  // printValue("Total FP", totalFPPerBlock);
+  // printValue("Useful FP", usefulFPPerBlock);
+  // printValue("Useful Ratio", usefulFPRatio);
+  // printValue("Global Loads/Block", globalLoadsPerBlock);
+  // printValue("Global Stores/Block", globalStoresPerBlock);
+  // printValue("Shared Loads/Block", sharedLoadsPerBlock);
+  // printValue("Shared Stores/Block", sharedStoresPerBlock);
+  // printValue("Arithmetic Intensity", arithmeticIntensity);
+  // printValue("Max Blocks", maxBlocks);
+
+  ProgramGenerator::printProgramParameters(params, 1, 5, 1, 18);
 
 
 
-  
+
   // Create a command queue.
   cl::CommandQueue queue(context.context(), context.device(), 0, &result);
   CLContext::throwOnError("cl::CommandQueue", result);
-  
+
   // Build a program from the source
   cl::Program::Sources progSource(1, std::make_pair(kernelSource.c_str(),
                                                     kernelSource.size()));
@@ -500,13 +503,29 @@ int main(int argc,
 
   std::vector<cl::Device> devices;
   devices.push_back(context.device());
-  
-  result = program.build(devices);
+
+  result = program.build(devices, "-cl-nv-verbose");
   if(result != CL_SUCCESS) {
     std::cout << "Source compilation failed.\n";
     std::cout << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(context.device());
     return 1;
   }
+
+  // Extract out the register usage
+  std::string log =
+    program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(context.device());
+  boost::regex regExpr("Used ([0-9]+) registers");
+  boost::smatch match;
+  std::string::const_iterator start, end;
+  start = log.begin();
+  end = log.end();
+  if(boost::regex_search(start, end, match, regExpr,
+                         boost::match_default)) {
+    printValue("Register Usage", match[1]);
+  } else {
+    printValue("Register Usage", 0);
+  }
+
 
   // Extract the kernel
   cl::Kernel kernel(program, "kernel_func", &result);
@@ -523,7 +542,7 @@ int main(int argc,
          j < params.padding || j         >= (params.paddedSize-params.padding)) {
         hostData[i*params.paddedSize +j]  = 0.0f;
       }
-      else {         
+      else {
         hostData[i*params.paddedSize + j] = (float)rand() / ((float)RAND_MAX + 1.0f);
       }
     }
@@ -548,7 +567,7 @@ int main(int argc,
     memcpy(refB, hostData, arraySize);
 
 #define SQR(x) ((x)*(x))
-    
+
     for(int t = 0; t < params.timeSteps; ++t) {
       for(int i = params.padding; i < params.paddedSize-params.padding; ++i) {
         for(int j = params.padding; j < params.paddedSize-params.padding; ++j) {
@@ -557,7 +576,7 @@ int main(int argc,
           float right  = refA[i*params.paddedSize + (j+1)];
           float top    = refA[(i-1)*params.paddedSize + (j)];
           float bottom = refA[(i+1)*params.paddedSize + (j)];
-          
+
           refB[i*params.paddedSize + j] = center +
             1.0f/sqrt(0.0001f + SQR(center-left) + SQR(center-right) +
                       SQR(center-top) + SQR(center-bottom));
@@ -618,7 +637,7 @@ int main(int argc,
     CLContext::throwOnError("Failed to set input parameter", result);
     result = kernel.setArg(1, *outputBuffer);
     CLContext::throwOnError("Failed to set output parameter", result);
-  
+
     // Invoke the kernel
     result = queue.enqueueNDRangeKernel(kernel, cl::NullRange,
                                         globalSize, localSize,
@@ -652,7 +671,7 @@ int main(int argc,
     / elapsed / 1e9;
 
   printValue("Device GFlop/s", gflops);
-  
+
   if(vm.count("verify")) {
     compareResults(reference, hostData, params);
   }
@@ -665,6 +684,6 @@ int main(int argc,
   if(vm.count("verify")) {
     delete [] reference;
   }
-  
+
   return 0;
 }

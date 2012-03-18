@@ -2,6 +2,7 @@
 # Support routines for experiment harness
 #
 
+import os
 import subprocess
 import sys
 import time
@@ -83,6 +84,9 @@ def run_experiment(filename):
                     for bsx in block_size_x:
                         for bsy in block_size_y:
                             for bsz in block_size_z:
+
+                                # Before each run, blow away the nv cache
+                                os.system('rm -rf ~/.nv/')
 
                                 curr = curr + 1
                                 print('Running %d of %d' % (curr, num_runs))
