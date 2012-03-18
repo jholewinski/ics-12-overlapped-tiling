@@ -1,0 +1,50 @@
+# Architecture specification for Tesla C2050
+
+# Generic compute 2.0 specifications
+max_regs_per_block: 32768
+shared_mem_per_sm: 49152
+max_blocks_per_sm: 8
+warp_size: 32
+max_warps_per_sm: 48
+max_threads_per_sm: 1536
+
+# Tesla C2050-specific specifications
+
+num_sm: 14
+global_bandwidth: 144.0
+shared_bandwidth: 1400
+
+fp_throughput:
+  - 1.03244
+  - 2.53241
+  - 3.91877
+  - 5.22502
+  - 6.59547
+  - 7.91456
+  - 9.23365
+  - 10.5527
+  - 10.8825
+  - 13.0626
+  - 14.3688
+  - 15.8681
+  - 16.9813
+  - 18.4673
+  - 19.7864
+  - 21.1055
+  - 22.4246
+  - 23.7437
+  - 23.6124
+  - 24.6271
+  - 25.6234
+  - 26.7827
+  - 26.4979
+  - 27.4147
+  - 26.8973
+  - 27.7508
+  - 27.2472
+  - 28.2033
+  - 27.9019
+  - 28.9158
+  - 28.3526
+  - 29.2175
+

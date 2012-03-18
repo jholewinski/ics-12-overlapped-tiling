@@ -11,7 +11,7 @@ typedef std::vector<std::string>  StringVector;
 CLContext::CLContext() {
   cl_int         result;
   PlatformVector allPlatforms;
-  
+
   result = cl::Platform::get(&allPlatforms);
   throwOnError("cl::Platform::get", result);
 
@@ -21,7 +21,7 @@ CLContext::CLContext() {
 
   platform_ = allPlatforms[0];
 
-  printValue("Platform", platform_.getInfo<CL_PLATFORM_NAME>());
+  //printValue("Platform", platform_.getInfo<CL_PLATFORM_NAME>());
 
   // Create context
   cl_context_properties cps[3] = {
@@ -41,7 +41,7 @@ CLContext::CLContext() {
 
   device_ = allDevices[0];
 
-  printValue("Device", device_.getInfo<CL_DEVICE_NAME>());
+  //printValue("Device", device_.getInfo<CL_DEVICE_NAME>());
 }
 
 CLContext::~CLContext() {
