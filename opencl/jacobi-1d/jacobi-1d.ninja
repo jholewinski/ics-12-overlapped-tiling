@@ -6,5 +6,5 @@ build $path/jacobi-1d.o : cxx-build $path/jacobi-1d.cpp
 
 # Executable
 build $bindir/ocl-jacobi-1d : link-executable $path/jacobi-1d.o $bindir/libclcommon.a
-  ldflags = $ldflags -lboost_program_options
+  ldflags = $ldflags -lboost_program_options -lboost_regex
 

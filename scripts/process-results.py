@@ -123,6 +123,7 @@ for line in sys.stdin.readlines():
     warps_per_block = threads_per_block / warp_size
     warps_per_sm = min(warps_per_block * blocks_per_sm, max_warps_per_sm)
     threads_per_sm = min(warps_per_sm * warp_size, max_threads_per_sm)
+    total_blocks = num_blocks_x * num_blocks_y * num_blocks_z
 
 
     ###=== Model the performance of this configuration ===###
@@ -132,7 +133,7 @@ for line in sys.stdin.readlines():
     exp_fp_throughput = query_by_index(fp_throughput, int(warps_per_sm)-1)*10
 
     # Determine needed giga-instructions
-    total_ginstr = total_fp_per_block * 1e-9
+    total_ginstr = total_fp_per_block * total_blocks * 1e-9
 
     # Estimate total compute time
     compute_time = total_ginstr / exp_fp_throughput
@@ -140,22 +141,22 @@ for line in sys.stdin.readlines():
 
     ### Global Memory Access Time
     # How much data do we need to pull to/from global memory?
-    global_data = global_per_block * 4.0 * 1e-9
-
-    # Assume our effective bandwidth is 1/num_sm of the total
-    global_bandwidth_per_sm = global_bandwidth # / num_sm
+    global_data = global_per_block * 4.0 * total_blocks * 1e-9
 
     # Also, due to alignment constraints, we almost always need two
     # transactions
-    global_bandwidth_per_sm = global_bandwidth_per_sm  / 2.0
+    adj_global_bandwidth = global_bandwidth  / 2.0
 
     # Estimate global memory access time
-    global_time = global_data / global_bandwidth_per_sm
+    global_time = global_data / adj_global_bandwidth
 
 
     ### Shared Memory Access Time
     # How much shared data do we need to copy?
-    shared_data = shared_per_block * 4.0 * 1e-9
+    shared_data = shared_per_block * 4.0 * 1e-9 # Shared memory is per block
+
+    blocks_per_sm = math.ceil(total_blocks / num_sm)
+    shared_data = shared_data*blocks_per_sm
 
     # Estimate shared memory access time
     shared_time = shared_data / shared_bandwidth
@@ -165,11 +166,11 @@ for line in sys.stdin.readlines():
     ### Totals
     # Estimate total execution time as the time needed for the limiting
     # resource
-    #exec_time = max(global_time, compute_time)
+    #exec_time = max(global_time, compute_time, shared_time)
     exec_time = global_time + compute_time + shared_time
 
     # What is the "expected" device performance?
-    exp_device_perf = total_fp_per_block / exec_time * 1e-9
+    exp_device_perf = total_fp_per_block * total_blocks / exec_time * 1e-9
 
     # Scale by useful ratio to get "expected" actual performance
     exp_actual_perf = exp_device_perf * useful_ratio
