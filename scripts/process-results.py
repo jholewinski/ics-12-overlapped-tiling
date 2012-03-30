@@ -58,10 +58,63 @@ max_warps_per_sm = float(arch['max_warps_per_sm'])
 max_threads_per_sm = float(arch['max_threads_per_sm'])
 warp_size = float(arch['warp_size'])
 fp_throughput = arch['fp_throughput']
+fp_throughput_all_sm = arch['fp_throughput_all_sm']
 global_bandwidth = float(arch['global_bandwidth'])
-shared_bandwidth = float(arch['shared_bandwidth'])
+shared_bandwidth = float(arch['shared_bandwidth'])*16.0
 num_sm = float(arch['num_sm'])
 
+
+# Set up excel dump
+excel_dump = open('dump.csv', 'w')
+
+dump_columns = [
+  'block_size_x',
+  'block_size_y',
+  'block_size_z',
+  'elems_per_thread',
+  'time_tile_size',
+  'elapsed_time',
+  'actual_gflops',
+  'device_gflops',
+  'num_regs',
+  'shared_loads_per_block',
+  'shared_stores_per_block',
+  'global_loads_per_block',
+  'global_stores_per_block',
+  'useful_fp_per_block',
+  'total_fp_per_block',
+  'useful_ratio',
+  'shared_size',
+  'warps_per_sm',
+  'threads_per_sm',
+  'total_blocks',
+  'shared_loads_per_step',
+  'shared_stores_per_step',
+  'total_fp_per_step',
+  'adj_bandwidth',
+  'global_data',
+  'global_time',
+  'shared_time',
+  'exp_fp_throughput',
+  'compute_time',
+  'limiting_time_step_1',
+  'global_time',
+  'shared_load_time',
+  'shared_store_time',
+  'shared_time',
+  'exp_fp_throughput',
+  'compute_time',
+  'limiting_time_step_n',
+  'adj_bandwidth',
+  'global_data',
+  'global_time',
+  'limiting_time_final_step',
+  'exec_time',
+  'exp_device_perf',
+  'exp_actual_perf'
+]
+
+excel_dump.write('%s,\n' % ','.join(dump_columns))
 
 # Set up configuration list
 configurations = []
@@ -86,7 +139,9 @@ for line in sys.stdin.readlines():
     useful_ratio = float(data['Useful Ratio'])
     shared_loads_per_block = float(data['Shared Loads/Block'])
     actual_gflops = float(data['Actual GFlop/s'])
+    device_gflops = float(data['Device GFlop/s'])
     num_regs = float(data['Register Usage'])
+    elapsed_time = float(data['Elapsed Time'])
 
     block_size_x = float(data['Block Size X'])
     num_blocks_x = float(data['Num Blocks X'])
@@ -111,6 +166,24 @@ for line in sys.stdin.readlines():
         num_blocks_z = float(data['Num Blocks Z'])
 
 
+    excel_dump.write('%d,' % int(block_size_x))
+    excel_dump.write('%d,' % int(block_size_y))
+    excel_dump.write('%d,' % int(block_size_z))
+    excel_dump.write('%d,' % int(elems_per_thread))
+    excel_dump.write('%d,' % int(time_tile_size))
+    excel_dump.write('%f,' % elapsed_time)
+    excel_dump.write('%f,' % actual_gflops)
+    excel_dump.write('%f,' % device_gflops)
+    excel_dump.write('%d,' % int(num_regs))
+    excel_dump.write('%d,' % int(shared_loads_per_block))
+    excel_dump.write('%d,' % int(shared_stores_per_block))
+    excel_dump.write('%d,' % int(global_loads_per_block))
+    excel_dump.write('%d,' % int(global_stores_per_block))
+    excel_dump.write('%d,' % int(useful_fp_per_block))
+    excel_dump.write('%d,' % int(total_fp_per_block))
+    excel_dump.write('%f,' % useful_ratio)
+    excel_dump.write('%d,' % int(shared_size))
+
     # Derive some parameters based on the program and architecture parameters
     global_per_block = global_loads_per_block + global_stores_per_block
     shared_per_block = shared_loads_per_block + shared_stores_per_block
@@ -125,55 +198,114 @@ for line in sys.stdin.readlines():
     threads_per_sm = min(warps_per_sm * warp_size, max_threads_per_sm)
     total_blocks = num_blocks_x * num_blocks_y * num_blocks_z
 
+    excel_dump.write('%d,' % int(warps_per_sm))
+    excel_dump.write('%d,' % int(threads_per_sm))
+    excel_dump.write('%d,' % int(total_blocks))
+
 
     ###=== Model the performance of this configuration ===###
 
-    ### Compute Time
-    # For our block distribution, what is our expected FP throughput
-    exp_fp_throughput = query_by_index(fp_throughput, int(warps_per_sm)-1)*10
+    if time_tile_size > 1:
+      shared_loads_per_step = total_blocks * shared_loads_per_block / (time_tile_size-1)
+    else:
+      shared_loads_per_step = 0.0
+    shared_stores_per_step = total_blocks * shared_stores_per_block / time_tile_size
+    total_fp_per_step = total_blocks * total_fp_per_block / time_tile_size
 
-    # Determine needed giga-instructions
-    total_ginstr = total_fp_per_block * total_blocks * 1e-9
-
-    # Estimate total compute time
-    compute_time = total_ginstr / exp_fp_throughput
+    excel_dump.write('%d,' % int(shared_loads_per_step))
+    excel_dump.write('%d,' % int(shared_stores_per_step))
+    excel_dump.write('%d,' % int(total_fp_per_step))
 
 
-    ### Global Memory Access Time
-    # How much data do we need to pull to/from global memory?
-    global_data = global_per_block * 4.0 * total_blocks * 1e-9
+    memory_scale = warps_per_sm / max_warps_per_sm
+    adj_global_bandwidth = global_bandwidth * memory_scale
 
-    # Also, due to alignment constraints, we almost always need two
-    # transactions
-    adj_global_bandwidth = global_bandwidth  / 2.0
+    ### Step 1
 
+    # For initial loads, we assume 50% bandwidth
+    adj_bandwidth = adj_global_bandwidth #/ 2.0
+    excel_dump.write('%f,' % adj_bandwidth)
+    # How much data do we need for the kernel? (GBytes)
+    global_data = total_blocks * global_loads_per_block * 4.0 * 1e-9
+    excel_dump.write('%f,' % global_data)
     # Estimate global memory access time
-    global_time = global_data / adj_global_bandwidth
+    global_time = global_data / adj_bandwidth
+    excel_dump.write('%f,' % global_time)
+
+    # How long will it take to complete the stores
+    shared_time = shared_stores_per_step * 4.0 * 1e-9 / shared_bandwidth
+    excel_dump.write('%f,' % shared_time)
+
+    # What is our expected FP throughput?
+    exp_fp_throughput = query_by_index(fp_throughput_all_sm,
+      int(warps_per_sm)-1)
+    excel_dump.write('%f,' % exp_fp_throughput)
+    # How long will compute take?
+    compute_time = total_fp_per_step * 1e-9 / exp_fp_throughput
+    excel_dump.write('%f,' % compute_time)
+
+    # What is the limiting resource?
+    limiting_time_step_1 = max(global_time, shared_time, compute_time)
+    excel_dump.write('%f,' % limiting_time_step_1)
+
+    #print('Step1: %f, %f, %f, %f' % (
+    #  global_time, shared_time, compute_time, limiting_time_step_1))
+
+    ### Step n > 1
+
+    # We do not access global memory here
+    global_time = 0.0
+    excel_dump.write('%f,' % global_time)
+
+    # What is the shared memory time?
+    shared_load_time = shared_loads_per_step * 4.0 * 1e-9 / shared_bandwidth
+    excel_dump.write('%f,' % shared_load_time)
+    shared_store_time = shared_stores_per_step * 4.0 * 1e-9 / shared_bandwidth
+    excel_dump.write('%f,' % shared_store_time)
+    shared_time = shared_load_time + shared_store_time
+    excel_dump.write('%f,' % shared_time)
+
+    # What is our expected FP throughput?
+    exp_fp_throughput = query_by_index(fp_throughput_all_sm,
+      int(warps_per_sm)-1)
+    excel_dump.write('%f,' % exp_fp_throughput)
+    # How long will compute take?
+    compute_time = total_fp_per_step * 1e-9 / exp_fp_throughput
+    excel_dump.write('%f,' % compute_time)
+
+    # What is the limiting resource?
+    limiting_time_step_n = max(global_time, shared_time, compute_time)
+    excel_dump.write('%f,' % limiting_time_step_n)
 
 
-    ### Shared Memory Access Time
-    # How much shared data do we need to copy?
-    shared_data = shared_per_block * 4.0 * 1e-9 # Shared memory is per block
+    ### Final write
 
-    blocks_per_sm = math.ceil(total_blocks / num_sm)
-    shared_data = shared_data*blocks_per_sm
+    # Here, we only write to global memory
+    # For initial loads, we assume 60% bandwidth
+    adj_bandwidth = adj_global_bandwidth * 0.60
+    excel_dump.write('%f,' % adj_bandwidth)
+    # How much data do we need for the kernel? (GBytes)
+    global_data = total_blocks * global_stores_per_block * 4.0 * 1e-9
+    excel_dump.write('%f,' % global_data)
+    # Estimate global memory access time
+    global_time = global_data / adj_bandwidth
+    excel_dump.write('%f,' % global_time)
 
-    # Estimate shared memory access time
-    shared_time = shared_data / shared_bandwidth
+    limiting_time_final_step = global_time
+    excel_dump.write('%f,' % limiting_time_final_step)
 
 
-
-    ### Totals
-    # Estimate total execution time as the time needed for the limiting
-    # resource
-    #exec_time = max(global_time, compute_time, shared_time)
-    exec_time = global_time + compute_time + shared_time
+    ### Total expected time
+    exec_time = limiting_time_step_1 + (time_tile_size-1)*limiting_time_step_n + limiting_time_final_step
+    excel_dump.write('%f,' % exec_time)
 
     # What is the "expected" device performance?
     exp_device_perf = total_fp_per_block * total_blocks / exec_time * 1e-9
+    excel_dump.write('%f,' % exp_device_perf)
 
     # Scale by useful ratio to get "expected" actual performance
     exp_actual_perf = exp_device_perf * useful_ratio
+    excel_dump.write('%f,' % exp_actual_perf)
 
 
     # Build the Configuration instance
@@ -187,6 +319,8 @@ for line in sys.stdin.readlines():
     conf.expected_performance = exp_actual_perf
 
     configurations.append(conf)
+
+    excel_dump.write('\n')
 
     #if global_time > compute_time:
     #  print('Limiting factor: memory')
@@ -220,4 +354,5 @@ for c in confs_by_expected_perf:
   print(c)
 
 
+excel_dump.close()
 

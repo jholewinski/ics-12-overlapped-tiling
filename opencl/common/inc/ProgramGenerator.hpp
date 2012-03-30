@@ -46,8 +46,8 @@ public:
     printValue("Time Tile Size", params.timeTileSize);
     printValue("Block Size X", params.blockSizeX);
     printValue("Block Size Y", params.blockSizeY);
-    printValue("Num Blocks X", params.blockSizeX);
-    printValue("Num Blocks Y", params.blockSizeY);
+    printValue("Num Blocks X", params.numBlocksX);
+    printValue("Num Blocks Y", params.numBlocksY);
     printValue("Elements/Thread", params.elementsPerThread);
     printValue("Shared Size", sharedSize);
     printValue("Total FP/Block", totalFPPerBlock);

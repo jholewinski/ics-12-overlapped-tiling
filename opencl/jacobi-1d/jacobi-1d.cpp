@@ -41,6 +41,7 @@ struct GeneratorParams {
   // Dummy
   int32_t     realPerBlockY;
   int32_t     blockSizeY;
+  int32_t     numBlocksY;
   int32_t     sharedSizeY;
 
 
@@ -89,6 +90,7 @@ struct GeneratorParams {
 
     realPerBlockY = 1;
     sharedSizeY = 1;
+    numBlocksY = 1;
   }
 };
 
