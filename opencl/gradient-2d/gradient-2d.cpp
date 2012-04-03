@@ -43,7 +43,9 @@ struct GeneratorParams {
   int32_t     numBlocksY;
   std::string fpSuffix;
 
-
+  bool timeOnlyGMem;
+  bool timeOnlyInstr;
+  bool timeOnlySMem;
 
   /**
    * Default constructor.
@@ -61,7 +63,10 @@ struct GeneratorParams {
       problemSize(ps),
       dataType(type),
       blockSizeX(bsx),
-      blockSizeY(bsy) {
+      blockSizeY(bsy),
+      timeOnlyGMem(false),
+      timeOnlyInstr(false),
+      timeOnlySMem(false) {
   }
 
   void computeDerived() {
@@ -206,6 +211,16 @@ void Gradient2DGenerator::generateLocals(std::ostream& stream,
     stream << "  " << params.dataType << " local" << i << ";\n";
     stream << "  " << params.dataType << " new" << i << ";\n";
   }
+
+  if(params.timeOnlyGMem) {
+    for(int32_t i = 0; i < params.elementsPerThread; ++i) {
+      stream << "  " << params.dataType << " test0_" << i << ";\n";
+      stream << "  " << params.dataType << " test1_" << i << ";\n";
+      stream << "  " << params.dataType << " test2_" << i << ";\n";
+      stream << "  " << params.dataType << " test3_" << i << ";\n";
+      stream << "  " << params.dataType << " test4_" << i << ";\n";
+    }
+  }
 }
 
 void Gradient2DGenerator::generateCompute(std::ostream& stream,
@@ -213,62 +228,91 @@ void Gradient2DGenerator::generateCompute(std::ostream& stream,
 
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  {\n";
-    stream << "    " << params.dataType
-           << " left, center, right, top, bottom;\n";
-    stream << "    // Left\n";
-    stream << "    left = *(inputPtr+(" << params.paddedSize << "*" << i
-           << ")-1);\n";
-    stream << "    // Center\n";
-    stream << "    center = *(inputPtr+(" << params.paddedSize << "*" << i
-           << "));\n";
-    stream << "    // Right\n";
-    stream << "    right = *(inputPtr+(" << params.paddedSize << "*" << i
-           << ")+1);\n";
-    stream << "    // Top\n";
-    stream << "    top = *(inputPtr+(" << params.paddedSize << "*" << (i-1)
-           << "));\n";
-    stream << "    // Bottom\n";
-    stream << "    bottom = *(inputPtr+(" << params.paddedSize << "*" << (i+1)
-           << "));\n";
-    stream << "    " << params.dataType
-           << " gradient = center + rsqrt(0.0001" << params.fpSuffix
-           << " + SQR(center-left) + SQR(center-right)"
-           << " + SQR(center-top) + SQR(center-bottom));\n";
-    stream << "    gradient = (valid" << i << ") ? gradient : 0.0"
-           << params.fpSuffix << ";\n";
-    stream << "    buffer[get_local_id(1)*" << params.elementsPerThread << "+"
-           << i
-           << "+1][get_local_id(0)+1] = gradient;\n";
-    stream << "    local" << i << " = gradient;\n";
+    if(!params.timeOnlySMem) {
+      stream << "    " << params.dataType
+             << " left, center, right, top, bottom;\n";
+      stream << "    // Left\n";
+      stream << "    left = *(inputPtr+(" << params.paddedSize << "*" << i
+             << ")-1);\n";
+      if(!params.timeOnlyInstr) {
+        stream << "    // Center\n";
+        stream << "    center = *(inputPtr+(" << params.paddedSize << "*" << i
+               << "));\n";
+        stream << "    // Right\n";
+        stream << "    right = *(inputPtr+(" << params.paddedSize << "*" << i
+               << ")+1);\n";
+        stream << "    // Top\n";
+        stream << "    top = *(inputPtr+(" << params.paddedSize << "*" << (i-1)
+               << "));\n";
+        stream << "    // Bottom\n";
+        stream << "    bottom = *(inputPtr+(" << params.paddedSize << "*" << (i+1)
+                << "));\n";
+      } else {
+        stream << "  center = right = top = bottom = left;\n";
+      }
+    }
+    if(params.timeOnlyGMem) {
+      stream << "  test0_" << i << " = left;\n";
+      stream << "  test1_" << i << " = center;\n";
+      stream << "  test2_" << i << " = top;\n";
+      stream << "  test3_" << i << " = bottom;\n";
+      stream << "  test4_" << i << " = left;\n";
+    } else {
+      if(params.timeOnlySMem) {
+        stream << "  float gradient = (float)get_local_id(0);\n";
+      } else {
+        stream << "    " << params.dataType
+               << " gradient = center + rsqrt(0.0001" << params.fpSuffix
+               << " + SQR(center-left) + SQR(center-right)"
+               << " + SQR(center-top) + SQR(center-bottom));\n";
+        stream << "    gradient = (valid" << i << ") ? gradient : 0.0"
+               << params.fpSuffix << ";\n";
+      }
+      if(!params.timeOnlyInstr) {
+        stream << "    buffer[get_local_id(1)*" << params.elementsPerThread << "+"
+               << i
+               << "+1][get_local_id(0)+1] = gradient;\n";
+      }
+      stream << "    local" << i << " = gradient;\n";
+    }
     stream << "  }\n";
   }
 
-  stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
+  if(!params.timeOnlyGMem && !params.timeOnlyInstr && !params.timeOnlySMem) {
+    stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
+  }
 
+  if(!params.timeOnlyGMem) {
   for(int32_t t = 1; t < params.timeTileSize; ++t) {
     stream << "  // Time Step " << t << "\n";
     for(int32_t i = 0; i < params.elementsPerThread; ++i) {
       stream << "  {\n";
       stream << "    " << params.dataType
              << " left, center, right, top, bottom;\n";
-      stream << "    // Left\n";
-      stream << "    left = buffer[get_local_id(1)*" << params.elementsPerThread
-             << "+" << i
-             << "+1][get_local_id(0)];\n";
+      if(!params.timeOnlyInstr) {
+        stream << "    // Left\n";
+        stream << "    left = buffer[get_local_id(1)*" << params.elementsPerThread
+               << "+" << i
+               << "+1][get_local_id(0)];\n";
+      }
       stream << "    // Center\n";
       stream << "    center = local" << i << ";\n";
-      stream << "    // Right\n";
-      stream << "    right = buffer[get_local_id(1)*" << params.elementsPerThread
-             << "+" << i
-             << "+1][get_local_id(0)+2];\n";
-      stream << "    // Top\n";
-      stream << "    top = buffer[get_local_id(1)*" << params.elementsPerThread
-             << "+" << i
-             << "][get_local_id(0)+1];\n";
-      stream << "    // Bottom\n";
-      stream << "    bottom = buffer[get_local_id(1)*" << params.elementsPerThread
-             << "+" << i
-             << "+2][get_local_id(0)+1];\n";
+      if(!params.timeOnlyInstr) {
+        stream << "    // Right\n";
+        stream << "    right = buffer[get_local_id(1)*" << params.elementsPerThread
+               << "+" << i
+               << "+1][get_local_id(0)+2];\n";
+        stream << "    // Top\n";
+        stream << "    top = buffer[get_local_id(1)*" << params.elementsPerThread
+               << "+" << i
+               << "][get_local_id(0)+1];\n";
+        stream << "    // Bottom\n";
+        stream << "    bottom = buffer[get_local_id(1)*" << params.elementsPerThread
+               << "+" << i
+               << "+2][get_local_id(0)+1];\n";
+      } else {
+        stream << "  left = right = top = bottom = center;\n";
+      }
       stream << "    " << params.dataType
              << " gradient = center + rsqrt(0.0001" << params.fpSuffix
              << " + SQR(center-left) + SQR(center-right)"
@@ -278,20 +322,40 @@ void Gradient2DGenerator::generateCompute(std::ostream& stream,
       stream << "    new" << i << " = gradient;\n";
       stream << "  }\n";
     }
-    stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
-    for(int32_t i = 0; i < params.elementsPerThread; ++i) {
-      stream << "  buffer[get_local_id(1)*" << params.elementsPerThread << "+"
-             << i
-             << "+1][get_local_id(0)+1] = new" << i << ";\n";
-      stream << "  local" << i << " = new" << i << ";\n";
+    if(!params.timeOnlyInstr) {
+      stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
+      for(int32_t i = 0; i < params.elementsPerThread; ++i) {
+        stream << "  buffer[get_local_id(1)*" << params.elementsPerThread << "+"
+               << i
+               << "+1][get_local_id(0)+1] = new" << i << ";\n";
+        stream << "  local" << i << " = new" << i << ";\n";
+      }
+      stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
+    } else {
+      for(int32_t i = 0; i < params.elementsPerThread; ++i) {
+        stream << "  local" << i << " = new" << i << ";\n";
+      }
     }
-    stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
+  }
+  }
+
+  if(params.timeOnlyInstr || params.timeOnlySMem) {
+    stream << "  if(get_local_id(0) == 1000000) {\n";
   }
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  if(writeValid" << i << " && writeValidX) {\n";
-    stream << "    *(outputPtr+(" << params.paddedSize << "*" << i
-           << ")) = local" << i << ";\n";
+    if(params.timeOnlyGMem) {
+      stream << "    *(outputPtr+(" << params.paddedSize << "*" << i
+             << ")) = test0_" << i << " + test1_" << i << " + test2_" << i
+             << " + test3_" << i << " + test4_" << i << ";\n";
+    } else {
+      stream << "    *(outputPtr+(" << params.paddedSize << "*" << i
+             << ")) = local" << i << ";\n";
+    }
     stream << "  }\n";
+  }
+  if(params.timeOnlyInstr || params.timeOnlySMem) {
+    stream << "}\n";
   }
 }
 
@@ -338,6 +402,7 @@ int main(int argc,
   cl_int      result;
   std::string kernelFile;
   std::string saveKernelFile;
+  std::string timeOnly;
 
   srand(123456);
 
@@ -372,6 +437,9 @@ int main(int argc,
      po::value<std::string>(&saveKernelFile)->default_value(""),
      "Save kernel to disk")
     ("verify,v", "Verify results")
+    ("time-only",
+     po::value<std::string>(&timeOnly)->default_value(""),
+     "Time only the specified kernel work (gmem, instr)")
     ;
 
   po::variables_map vm;
@@ -381,6 +449,16 @@ int main(int argc,
   if(vm.count("help")) {
     std::cerr << desc;
     return 1;
+  }
+
+  if(timeOnly == "gmem") {
+    params.timeOnlyGMem = true;
+  } else if(timeOnly == "instr") {
+    params.timeOnlyInstr = true;
+  } else if(timeOnly == "smem") {
+    params.timeOnlySMem = true;
+  } else {
+    assert(timeOnly.size() == 0);
   }
 
   std::string kernelSource;

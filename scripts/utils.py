@@ -126,7 +126,7 @@ def run_experiment(filename):
                                         proc.terminate()
                                         proc.wait()
                                         break
-                                    
+
                                 end_time = time.time()
 
                                 if proc.returncode != 0:
