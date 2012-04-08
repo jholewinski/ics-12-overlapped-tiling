@@ -7,6 +7,7 @@ ldflags = $ldflags -Lsupport/opencl/lib -lOpenCL
 
 subninja $path/common/common.ninja
 
+subninja $path/cs-3d/cs-3d.ninja
 subninja $path/cdsc-tv-update-2d/cdsc-tv-update-2d.ninja
 subninja $path/fdtd-2d/fdtd-2d.ninja
 subninja $path/gradient-2d/gradient-2d.ninja

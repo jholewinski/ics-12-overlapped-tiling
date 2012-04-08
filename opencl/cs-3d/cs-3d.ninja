@@ -1,0 +1,10 @@
+
+path = opencl/cs-3d
+
+# Sources
+build $path/cs-3d.o : cxx-build $path/cs-3d.cpp
+
+# Executable
+build $bindir/ocl-cs-3d : link-executable $path/cs-3d.o $bindir/libclcommon.a
+  ldflags = $ldflags -lboost_program_options
+
