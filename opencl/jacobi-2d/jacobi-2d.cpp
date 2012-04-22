@@ -167,7 +167,8 @@ void Jacobi2DGenerator::generateHeader(std::ostream& stream,
   stream << "/* Auto-generated.  Do not edit by hand. */\n";
   stream << "__kernel\n";
   stream << "void kernel_func(__global " << params.dataType << "* input,\n";
-  stream << "                 __global " << params.dataType << "* output) {\n";
+  stream << "                 __global " << params.dataType << "* output,\n";
+  stream << "                 __global unsigned int* clockData) {\n";
 }
 
 void Jacobi2DGenerator::generateFooter(std::ostream& stream) {
@@ -178,6 +179,9 @@ void Jacobi2DGenerator::generateLocals(std::ostream& stream,
                                        const GeneratorParams& params) {
   stream << "  __local " << params.dataType << " buffer[" << params.sharedSizeY
          << "][" << params.sharedSizeX << "];\n";
+
+  //stream << "  unsigned int clockStart, clockStop;\n";
+  //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStart));\n";
 
   // Compute some pointer values
   stream << "  __global " << params.dataType
@@ -239,10 +243,17 @@ void Jacobi2DGenerator::generateLocals(std::ostream& stream,
       stream << "  " << params.dataType << " test4_" << i << ";\n";
     }
   }
+
+  //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStop));\n";
+  //stream << "  if(get_global_id(0) == 0) {\n";
+  //stream << "    clockData[0] = (clockStop - clockStart);\n";
+  //stream << "  }\n";
 }
 
 void Jacobi2DGenerator::generateCompute(std::ostream& stream,
                                         const GeneratorParams& params) {
+
+  //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStart));\n";
 
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  {\n";
@@ -297,6 +308,13 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
   if(!params.timeOnlyGMem && !params.timeOnlyInstr && !params.timeOnlySMem) {
     stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
   }
+
+  //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStop));\n";
+  //stream << "  if(get_global_id(0) == 0) {\n";
+  //stream << "    clockData[1] = (clockStop - clockStart);\n";
+  //stream << "  }\n";
+
+  //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStart));\n";
 
   if(!params.timeOnlyGMem) {
   for(int32_t t = 1; t < params.timeTileSize; ++t) {
@@ -374,6 +392,13 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
   }
   }
 
+  //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStop));\n";
+  //stream << "  if(get_global_id(0) == 0) {\n";
+  //stream << "    clockData[2] = (clockStop - clockStart);\n";
+  //stream << "  }\n";
+
+  //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStart));\n";
+
   if(params.timeOnlyInstr || params.timeOnlySMem) {
     stream << "  if(get_local_id(0) == 1000000) {\n";
   }
@@ -395,6 +420,11 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
   if(params.timeOnlyInstr || params.timeOnlySMem) {
     stream << "}\n";
   }
+
+  //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStop));\n";
+  //stream << "  if(get_global_id(0) == 0) {\n";
+  //stream << "    clockData[3] = (clockStop - clockStart);\n";
+  //stream << "  }\n";
 }
 
 
@@ -717,6 +747,10 @@ int main(int argc,
                           arraySize, NULL, &result);
   CLContext::throwOnError("Failed to allocate device output", result);
 
+  cl::Buffer deviceClock(context.context(), CL_MEM_WRITE_ONLY,
+                         sizeof(unsigned int)*128, NULL, &result);
+  CLContext::throwOnError("Failed to allocate device output", result);
+
   // Copy host data to device
   result = queue.enqueueWriteBuffer(deviceInput, CL_TRUE, 0,
                                     arraySize, hostData,
@@ -749,6 +783,8 @@ int main(int argc,
     CLContext::throwOnError("Failed to set input parameter", result);
     result = kernel.setArg(1, *outputBuffer);
     CLContext::throwOnError("Failed to set output parameter", result);
+    result = kernel.setArg(2, deviceClock);
+    CLContext::throwOnError("Failed to set output parameter", result);
 
     // Invoke the kernel
     result = queue.enqueueNDRangeKernel(kernel, cl::NullRange,
@@ -764,9 +800,16 @@ int main(int argc,
   double endTime = rtclock();
   double elapsed = endTime - startTime;
 
+  unsigned int hostClock[128];
+
   // Copy results back to host
   result = queue.enqueueReadBuffer(*inputBuffer, CL_TRUE, 0,
                                    arraySize, hostData,
+                                   NULL, NULL);
+  CLContext::throwOnError("Failed to copy result to host", result);
+
+  result = queue.enqueueReadBuffer(deviceClock, CL_TRUE, 0,
+                                   sizeof(unsigned int)*128, hostClock,
                                    NULL, NULL);
   CLContext::throwOnError("Failed to copy result to host", result);
 
@@ -788,7 +831,11 @@ int main(int argc,
     compareResults(reference, hostData, params);
   }
 
-
+  //printValue("Clock (Init)", hostClock[0]);
+  //printValue("Clock (TS 0)", hostClock[1]);
+  //printValue("Clock (TS 1+)", hostClock[2]);
+  //printValue("Clock (Write)", hostClock[3]);
+  //printValue("Clock (Total)", (hostClock[0] + hostClock[1] + hostClock[2] + hostClock[3]));
 
   // Clean-up
   delete [] hostData;

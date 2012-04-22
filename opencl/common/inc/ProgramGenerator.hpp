@@ -57,6 +57,8 @@ public:
     printValue("Global Stores/Block", globalStoresPerBlock);
     printValue("Shared Loads/Block", sharedLoadsPerBlock);
     printValue("Shared Stores/Block", sharedStoresPerBlock);
+    printValue("Real Per Block X", params.realPerBlockX);
+    printValue("Real Per Block Y", params.realPerBlockY);
   }
 
 };
