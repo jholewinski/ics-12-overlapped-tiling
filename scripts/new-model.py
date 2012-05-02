@@ -62,14 +62,19 @@ def main():
   gld_hidden_latency = gld_issue * (global_data.active_warps_per_block-1)
 
   # What is the stall amount?
-  gld_stall = gld_time - gld_hidden_latency
+  gld_stall = max(gld_time - gld_hidden_latency, 0)
+  gld_time = gld_time + gld_stall
 
   # Estimate compute time
-  compute = global_data.ops_per_point * global_data.cpi
+  #compute_issue = global_data.ops_per_point * global_data.cpi
+  compute_time = global_data.cpi * 24  # Compute latency
+  compute_hidden_latency = global_data.cpi * (global_data.active_warps_per_block-1)
+  compute_stall = max(0, compute_time - compute_hidden_latency)
+  compute = (global_data.cpi + compute_stall) * global_data.ops_per_point
 
   # Estimate shared-st time
   sst_issue = global_data.num_store * global_data.cpi
-  sst_time = sst_issue + global_data.shared_latency
+  sst_time = sst_issue #+ global_data.shared_latency
 
 
   # Estimate shared-ld time
@@ -80,7 +85,14 @@ def main():
   sld_hidden_latency = sld_issue * (global_data.active_warps_per_block-1)
 
   # What is the stall amount?
-  sld_stall = gld_time - gld_hidden_latency
+  sld_stall = max(0, sld_time - sld_hidden_latency)
+  sld_time = sld_time + sld_stall
+
+  # What is the throughput constraint?
+  # It takes 2 cycles to service a load
+  sld_throughput_cycles = 2 * global_data.num_load * global_data.active_warps_per_block
+
+  sld_time = max(sld_time, sld_throughput_cycles)
 
 
   # Estimate global-st time
@@ -89,6 +101,8 @@ def main():
 
 
   time = gld_time + compute + sst_time + (global_data.time_tile_size-1)*(sld_time + compute + sst_time) + gst_time
+
+  time = time * global_data.active_warps_per_block
 
   # Cycles is for one block, scale to all blocks on an SM
   time = time * (global_data.trapezoid_per_stage / global_data.num_sm)

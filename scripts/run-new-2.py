@@ -4,16 +4,16 @@ from math import *
 from subprocess import *
 import os.path
 import sys
+import math
 
 program = '../../build.out/ocl-jacobi-2d'
 
-time_tile_sizes = [1, 2, 3, 4]
-elems_per_thread = [4, 6, 8, 10]
+time_tile_sizes = [2, 3, 4]
+elems_per_thread = [6, 8, 10]
 block_x = range(32, 64+1, 16)
 block_y = range(8, 16+1, 4)
 
-dump_program = './dump-cl-binary.x'
-sim_program = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'new-model.py')
+sim_program = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'new-model-2.py')
 
 data_points = []
 min_elapsed = 1000.0
@@ -43,34 +43,10 @@ for tts in time_tile_sizes:
 
         elapsed_time = float(program_data['Elapsed Time'])
 
-        # Get PTX
-        #args = '%s kernel.tmp.cl' % dump_program
-        #call(args.split())
-        #file_handle = open('kernel.tmp.cl.ptx')
-        #ptx = file_handle.read()
-        #file_handle.close()
-        #log.write(ptx)
-
-        # Post-process PTX
-        #ptx = ptx.replace(', texmode_independent', '')
-        #ptx = ptx.replace('.ptr .global', '')
-
-        # Save it to a temp file
-        #file_handle = open('kernel.tmp.ptx', 'w')
-        #file_handle.write(ptx)
-        #file_handle.close()
-
         # Write YAML for simulator
         file_handle = open('tmp.yaml', 'w')
 
-        file_handle.write('mem_latency: 500\n')
-        file_handle.write('mem_pipeline_depth: 16\n')
-        file_handle.write('bandwidth: 115e9\n')
-        file_handle.write('coalesce_degree: 16\n')
-        file_handle.write('data_size: 4\n')
-        file_handle.write('cpi: 1\n')
-        file_handle.write('global_sync: 3350\n')
-        file_handle.write('shared_latency: 32\n')
+
 
 
         # J2D
@@ -109,23 +85,54 @@ for tts in time_tile_sizes:
         #file_handle.write('ops_per_point: 11\n')
 
 
-        num_warp_instrs = tts * 20
-        file_handle.write('num_warp_instr: %d\n' % num_warp_instrs)
-
-        shared_size = float(program_data['Shared Size'])
+        # Arch parameters
         total_shared_per_sm = 49152.0
+        max_warps_per_sm = 48.0
+        max_threads_per_sm = 1536.0
+        max_blocks_per_sm = 8.0
+        num_sm = 14.0
+
+
+        file_handle.write('mem_latency: 500\n')
+        file_handle.write('bandwidth: 115e9\n')
+        file_handle.write('cpi: 1\n')
+        file_handle.write('global_sync: 3350\n')
+        file_handle.write('shared_latency: 32\n')
+        file_handle.write('compute_latency: 24\n')
+        file_handle.write('shared_throughput: 0.5\n')
+
+
+        # Program properties
+        block_size_x = float(program_data['Block Size X'])
+        block_size_y = float(program_data['Block Size Y'])
+        num_warps_per_block = block_size_x * block_size_y / 32.0
+        shared_size_per_block = float(program_data['Shared Size'])
+        num_blocks_x = float(program_data['Num Blocks X'])
+        num_blocks_y = float(program_data['Num Blocks Y'])
+
+        # Figure out how many blocks we can execute concurrently
+        blocks_per_sm = max(
+          math.floor(num_warps_per_block / max_warps_per_sm),
+          math.floor(total_shared_per_sm / shared_size_per_block))
+        assert(int(blocks_per_sm) > 0)
+
+        # Now how many warps is that?
+        active_warps_per_sm = num_warps_per_block * blocks_per_sm
+
+        file_handle.write('active_warps: %f\n' % active_warps_per_sm)
+
+        total_blocks_per_sm = math.ceil(num_blocks_x * num_blocks_y / num_sm)
+        stages_per_sm = math.ceil(total_blocks_per_sm / blocks_per_sm)
+        file_handle.write('stages_per_sm: %f\n' % stages_per_sm)
 
         file_handle.write('time_tile_size: %d\n' % tts)
 
-        concurr_blocks_per_sm = floor(min(2.0, total_shared_per_sm / shared_size))
-        concurr_blocks_per_sm = max(concurr_blocks_per_sm, 1)
-        block_size_x = float(program_data['Block Size X'])
-        block_size_y = float(program_data['Block Size Y'])
-        num_warps = block_size_x * block_size_y / 32.0
+        #concurr_blocks_per_sm = floor(min(2.0, total_shared_per_sm / shared_size))
+        #concurr_blocks_per_sm = max(concurr_blocks_per_sm, 1)
         #concurr_blocks_per_sm = 8.0
-        file_handle.write('active_warps_per_block: %f\n' % num_warps)
-        file_handle.write('concurrent_blocks: %f\n' % concurr_blocks_per_sm)
-        file_handle.write('num_sm: 14\n')
+        #file_handle.write('active_warps_per_block: %f\n' % num_warps)
+        #file_handle.write('concurrent_blocks: %f\n' % concurr_blocks_per_sm)
+        #file_handle.write('num_sm: 14\n')
 
         actual_gflops = float(program_data['Actual GFlop/s'])
 
@@ -138,17 +145,16 @@ for tts in time_tile_sizes:
         file_handle.write('real_per_block_y: %d\n' % int(program_data['Real Per Block Y']))
 
 
-        num_blocks_x = float(program_data['Num Blocks X'])
-        num_blocks_y = float(program_data['Num Blocks Y'])
-        num_blocks = num_blocks_x * num_blocks_y
-        file_handle.write('trapezoid_per_stage: %f\n' % num_blocks)
-        file_handle.write('concurr_blocks_per_sm: %f\n' % concurr_blocks_per_sm)
 
-        num_invocations = 64.0 / float(tts)
-        file_handle.write('num_invocations: %f\n' % num_invocations)
+        #num_blocks = num_blocks_x * num_blocks_y
+        #file_handle.write('trapezoid_per_stage: %f\n' % num_blocks)
+        #file_handle.write('concurr_blocks_per_sm: %f\n' % concurr_blocks_per_sm)
 
-        file_handle.write('clock: 1.30\n')
-        file_handle.write('kernel_launch_penalty: 5000\n')
+        #num_invocations = 64.0 / float(tts)
+        #file_handle.write('num_invocations: %f\n' % num_invocations)
+
+        #file_handle.write('clock: 1.30\n')
+        #file_handle.write('kernel_launch_penalty: 5000\n')
         file_handle.close()
 
         # Run the sim
@@ -170,7 +176,7 @@ for tts in time_tile_sizes:
 
         sim_cycles = float(sim_data['Cycles/Iteration'])
 
-        sim_time = sim_cycles / 1.30e9 * (64.0 / float(tts))
+        sim_time = sim_cycles / 1.15e9 * (64.0 / float(tts))
 
         log.write('Elapsed: %f  Simulated: %f\n' % (elapsed_time, sim_time))
 
