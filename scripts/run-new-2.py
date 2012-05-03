@@ -8,10 +8,20 @@ import math
 
 program = '../../build.out/ocl-jacobi-2d'
 
-time_tile_sizes = [2, 3, 4]
-elems_per_thread = [6, 8, 10]
-block_x = range(32, 64+1, 16)
-block_y = range(8, 16+1, 4)
+#time_tile_sizes = [2, 3, 4, 5, 6, 7, 8]
+elems_per_thread = [1]
+
+time_tile_sizes = [1]
+#elems_per_thread = [6, 8, 10, 12]
+
+#block_x = range(32, 64+1, 16)
+#block_y = range(8, 16+1, 4)
+
+block_x = [64]
+block_y = [8]
+
+#block_x = [16, 32, 48, 64]
+#block_y = [8, 16]
 
 sim_program = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'new-model-2.py')
 
@@ -20,7 +30,7 @@ min_elapsed = 1000.0
 
 log = open('run.log', 'w')
 
-print('bsx, bsy, tts, elems, elapsed, sim, gflops')
+print('bsx,bsy,tts,elems,elapsed,sim,gflops,occupancy,')
 for tts in time_tile_sizes:
   for elems in elems_per_thread:
     for bsx in block_x:
@@ -93,7 +103,7 @@ for tts in time_tile_sizes:
         num_sm = 14.0
 
 
-        file_handle.write('mem_latency: 500\n')
+        file_handle.write('mem_latency: 600\n')
         file_handle.write('bandwidth: 115e9\n')
         file_handle.write('cpi: 1\n')
         file_handle.write('global_sync: 3350\n')
@@ -111,9 +121,9 @@ for tts in time_tile_sizes:
         num_blocks_y = float(program_data['Num Blocks Y'])
 
         # Figure out how many blocks we can execute concurrently
-        blocks_per_sm = max(
-          math.floor(num_warps_per_block / max_warps_per_sm),
-          math.floor(total_shared_per_sm / shared_size_per_block))
+        blocks_per_sm = min(
+          math.floor(max_warps_per_sm / num_warps_per_block),
+          math.floor(total_shared_per_sm / max(1, shared_size_per_block)))
         assert(int(blocks_per_sm) > 0)
 
         # Now how many warps is that?
@@ -183,8 +193,11 @@ for tts in time_tile_sizes:
         data_points.append([bsx, bsy, tts, elems, elapsed_time, sim_time])
         min_elapsed = min(min_elapsed, elapsed_time)
 
-        print('%d,%d,%d,%d,%f,%f,%f' % (bsx, bsy, tts, elems, elapsed_time, sim_time, actual_gflops))
+        occupancy = active_warps_per_sm / max_warps_per_sm
+
+        print('%d,%d,%d,%d,%f,%f,%f,%f,' % (bsx, bsy, tts, elems, elapsed_time, sim_time, actual_gflops, occupancy))
         sys.stdout.flush()
+
 #sorted_data = sorted(data_points, key=lambda pt: pt[3])
 #sorted_data = data_points
 
