@@ -6,13 +6,13 @@ import os.path
 import sys
 import math
 
-program = '../../build.out/ocl-jacobi-2d'
+program = '../../build.out/ocl-gradient-2d'
 
 #time_tile_sizes = [2, 3, 4, 5, 6, 7, 8]
-elems_per_thread = [1]
+#elems_per_thread = [10]
 
-time_tile_sizes = [1]
-#elems_per_thread = [6, 8, 10, 12]
+time_tile_sizes = [2, 4, 6]
+elems_per_thread = [4, 6, 8, 10]
 
 #block_x = range(32, 64+1, 16)
 #block_y = range(8, 16+1, 4)
@@ -20,8 +20,8 @@ time_tile_sizes = [1]
 block_x = [64]
 block_y = [8]
 
-#block_x = [16, 32, 48, 64]
-#block_y = [8, 16]
+block_x = [32, 48, 64]
+block_y = [8, 16]
 
 sim_program = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'new-model-2.py')
 
@@ -60,11 +60,11 @@ for tts in time_tile_sizes:
 
 
         # J2D
-        file_handle.write('elems_per_op: 5\n')
-        file_handle.write('num_arrays: 1\n')
-        file_handle.write('num_load: 5\n')
-        file_handle.write('num_store: 1\n')
-        file_handle.write('ops_per_point: 5\n')
+        #file_handle.write('elems_per_op: 5\n')
+        #file_handle.write('num_arrays: 1\n')
+        #file_handle.write('num_load: 5\n')
+        #file_handle.write('num_store: 1\n')
+        #file_handle.write('ops_per_point: 5\n')
 
         # P2D
         #file_handle.write('elems_per_op: 9\n')
@@ -81,11 +81,11 @@ for tts in time_tile_sizes:
         #file_handle.write('ops_per_point: 42\n')
 
         # Gradient 2D
-        #file_handle.write('elems_per_op: 5\n')
-        #file_handle.write('num_arrays: 1\n')
-        #file_handle.write('num_load: 5\n')
-        #file_handle.write('num_store: 1\n')
-        #file_handle.write('ops_per_point: 15\n')
+        file_handle.write('elems_per_op: 5\n')
+        file_handle.write('num_arrays: 1\n')
+        file_handle.write('num_load: 5\n')
+        file_handle.write('num_store: 1\n')
+        file_handle.write('ops_per_point: 15\n')
 
         # FDTD 2D
         #file_handle.write('elems_per_op: 7\n')
@@ -103,6 +103,7 @@ for tts in time_tile_sizes:
         num_sm = 14.0
 
 
+        file_handle.write('num_sm: %d\n' % num_sm)
         file_handle.write('mem_latency: 600\n')
         file_handle.write('bandwidth: 115e9\n')
         file_handle.write('cpi: 1\n')
@@ -110,6 +111,7 @@ for tts in time_tile_sizes:
         file_handle.write('shared_latency: 32\n')
         file_handle.write('compute_latency: 24\n')
         file_handle.write('shared_throughput: 0.5\n')
+        file_handle.write('clock: 1.15e9\n')
 
 
         # Program properties
@@ -136,6 +138,7 @@ for tts in time_tile_sizes:
         file_handle.write('stages_per_sm: %f\n' % stages_per_sm)
 
         file_handle.write('time_tile_size: %d\n' % tts)
+        file_handle.write('elems_per_thread: %d\n' % elems)
 
         #concurr_blocks_per_sm = floor(min(2.0, total_shared_per_sm / shared_size))
         #concurr_blocks_per_sm = max(concurr_blocks_per_sm, 1)

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import math
 import sys
 import yaml
 
@@ -25,6 +26,25 @@ def main():
   time_tile_size = float(config['time_tile_size'])
   stages_per_sm = float(config['stages_per_sm'])
   global_sync = float(config['global_sync'])
+  num_sm = float(config['num_sm'])
+  bandwidth = float(config['bandwidth'])
+  clock = float(config['clock'])
+  elems_per_thread = float(config['elems_per_thread'])
+
+
+
+  # What is the per-SM memory bandwidth (approximately)
+  bw_per_sm = bandwidth / num_sm
+
+  # What is that in words (or per load)
+  words_per_sec = bw_per_sm / 4.0
+  print('words_per_sec: %f' % words_per_sec)
+
+  # What is that in words / clock
+  words_per_clock = words_per_sec / clock
+  print('words_per_clock: %f' % words_per_clock)
+
+
 
   # How long does it take to issue the global loads?
   gld_issue = num_load * cpi * active_warps
@@ -41,6 +61,16 @@ def main():
   # Figure out how long until compute can start in the first warp
   gld_time = gld_first_time + gld_stall
   print('gld_time: %f' % gld_time)
+
+  # How long will it take to transfer all of the needed data?
+  gld_words = num_load * active_warps * 32
+
+  gld_bw_time = math.ceil(gld_words / words_per_clock)
+  print('gld_bw_time: %f' % gld_bw_time)
+
+  # Which wins out, latency or bw?
+  gld_time = max(gld_time, gld_bw_time)
+
 
   # How long does it take to issue a compute instruction for all warps?
   compute_issue = cpi * active_warps
@@ -96,7 +126,12 @@ def main():
   time = gld_time + compute + sst_time + (time_tile_size-1)*(sld_time + compute + sst_time) + gst_time
   print('time: %f' % time)
 
+  # Account for spatial tiling
+  time = time * elems_per_thread
+  print('time: %f' % time)
+
   time = time * stages_per_sm
+  print('stages_per_sm: %f' % stages_per_sm)
   print('time: %f' % time)
 
   total = time + global_sync
