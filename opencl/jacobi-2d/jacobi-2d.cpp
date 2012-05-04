@@ -825,6 +825,8 @@ int main(int argc,
     * (double)params.elementsPerThread * 5.0 * (double)params.timeSteps
     / elapsed / 1e9;
 
+  printValue("Real Size", params.realSize);
+
   printValue("Device GFlop/s", gflops);
 
   if(vm.count("verify")) {

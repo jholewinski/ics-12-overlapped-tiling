@@ -59,7 +59,7 @@ def main():
   print('gld_stall: %f' % gld_stall)
 
   # Figure out how long until compute can start in the first warp
-  gld_time = gld_first_time + gld_stall
+  gld_time = gld_first_time #+ gld_stall
   print('gld_time: %f' % gld_time)
 
   # How long will it take to transfer all of the needed data?
@@ -81,7 +81,8 @@ def main():
   print('compute_stall: %f' % compute_stall)
 
   # What is the total compute time?
-  compute = (compute_issue + active_warps*compute_stall) * ops_per_point
+  #compute = (compute_issue + active_warps*compute_stall) * ops_per_point
+  compute = compute_issue * ops_per_point + compute_stall * ops_per_point + compute_latency
   print('compute: %f' % compute)
 
   # Estimate shared-st time
@@ -120,19 +121,19 @@ def main():
   gst_issue = num_store * cpi * active_warps
   print('gst_issue: %f' % gst_issue)
 
-  gst_time = gst_issue + mem_latency  # Is this right?
+  gst_time = gst_issue #+ mem_latency  # Is this right?
   print('gst_time: %f' % gst_time)
 
   time = gld_time + compute + sst_time + (time_tile_size-1)*(sld_time + compute + sst_time) + gst_time
-  print('time: %f' % time)
+  print('cycles (1 point): %f' % time)
 
   # Account for spatial tiling
   time = time * elems_per_thread
-  print('time: %f' % time)
+  print('cycles (E points): %f' % time)
 
   time = time * stages_per_sm
   print('stages_per_sm: %f' % stages_per_sm)
-  print('time: %f' % time)
+  print('cycles (w/o launch penalty): %f' % time)
 
   total = time + global_sync
 

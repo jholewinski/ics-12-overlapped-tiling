@@ -6,22 +6,22 @@ import os.path
 import sys
 import math
 
-program = '../../build.out/ocl-gradient-2d'
+program = '../../build.out/ocl-fdtd-2d'
 
 #time_tile_sizes = [2, 3, 4, 5, 6, 7, 8]
 #elems_per_thread = [10]
 
-time_tile_sizes = [2, 4, 6]
-elems_per_thread = [4, 6, 8, 10]
+time_tile_sizes = [2, 4, 6, 8, 10]
+elems_per_thread = [4, 6, 8, 10, 12]
 
 #block_x = range(32, 64+1, 16)
 #block_y = range(8, 16+1, 4)
 
-block_x = [64]
-block_y = [8]
-
-block_x = [32, 48, 64]
+block_x = [16, 32, 48, 64]
 block_y = [8, 16]
+
+#block_x = [32, 48]
+#block_y = [8, 16]
 
 sim_program = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'new-model-2.py')
 
@@ -81,18 +81,18 @@ for tts in time_tile_sizes:
         #file_handle.write('ops_per_point: 42\n')
 
         # Gradient 2D
-        file_handle.write('elems_per_op: 5\n')
-        file_handle.write('num_arrays: 1\n')
-        file_handle.write('num_load: 5\n')
-        file_handle.write('num_store: 1\n')
-        file_handle.write('ops_per_point: 15\n')
+        #file_handle.write('elems_per_op: 5\n')
+        #file_handle.write('num_arrays: 1\n')
+        #file_handle.write('num_load: 5\n')
+        #file_handle.write('num_store: 1\n')
+        #file_handle.write('ops_per_point: 15\n')
 
         # FDTD 2D
-        #file_handle.write('elems_per_op: 7\n')
-        #file_handle.write('num_arrays: 3\n')
-        #file_handle.write('num_load: 7\n')
-        #file_handle.write('num_store: 3\n')
-        #file_handle.write('ops_per_point: 11\n')
+        file_handle.write('elems_per_op: 7\n')
+        file_handle.write('num_arrays: 3\n')
+        file_handle.write('num_load: 7\n')
+        file_handle.write('num_store: 3\n')
+        file_handle.write('ops_per_point: 11\n')
 
 
         # Arch parameters
@@ -126,7 +126,7 @@ for tts in time_tile_sizes:
         blocks_per_sm = min(
           math.floor(max_warps_per_sm / num_warps_per_block),
           math.floor(total_shared_per_sm / max(1, shared_size_per_block)))
-        assert(int(blocks_per_sm) > 0)
+        blocks_per_sm = max(blocks_per_sm, 1.0)
 
         # Now how many warps is that?
         active_warps_per_sm = num_warps_per_block * blocks_per_sm
