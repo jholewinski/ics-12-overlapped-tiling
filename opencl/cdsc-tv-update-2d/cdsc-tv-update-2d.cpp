@@ -573,6 +573,10 @@ int main(int argc,
   printValue("Arithmetic Intensity", arithmeticIntensity);
   printValue("Max Blocks", maxBlocks);
 
+
+  ProgramGenerator::printProgramParameters(params, 1, 7, 1, flopPerPoint);
+
+  
   // Create a command queue.
   cl::CommandQueue queue(context.context(), context.device(), 0, &result);
   CLContext::throwOnError("cl::CommandQueue", result);

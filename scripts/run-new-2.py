@@ -6,7 +6,7 @@ import os.path
 import sys
 import math
 
-program = '../../build.out/ocl-fdtd-2d'
+program = '../../build.out/ocl-cdsc-tv-update-2d'
 
 #time_tile_sizes = [2, 3, 4, 5, 6, 7, 8]
 #elems_per_thread = [10]
@@ -73,6 +73,13 @@ for tts in time_tile_sizes:
         #file_handle.write('num_store: 1\n')
         #file_handle.write('ops_per_point: 9\n')
 
+        # TV Update 2D
+        file_handle.write('elems_per_op: 7\n')
+        file_handle.write('num_arrays: 1\n')
+        file_handle.write('num_load: 7\n')
+        file_handle.write('num_store: 1\n')
+        file_handle.write('ops_per_point: 57\n')
+
         # Rician 2D
         #file_handle.write('elems_per_op: 9\n')
         #file_handle.write('num_arrays: 1\n')
@@ -88,11 +95,11 @@ for tts in time_tile_sizes:
         #file_handle.write('ops_per_point: 15\n')
 
         # FDTD 2D
-        file_handle.write('elems_per_op: 7\n')
-        file_handle.write('num_arrays: 3\n')
-        file_handle.write('num_load: 7\n')
-        file_handle.write('num_store: 3\n')
-        file_handle.write('ops_per_point: 11\n')
+        #file_handle.write('elems_per_op: 7\n')
+        #file_handle.write('num_arrays: 3\n')
+        #file_handle.write('num_load: 7\n')
+        #file_handle.write('num_store: 3\n')
+        #file_handle.write('ops_per_point: 11\n')
 
 
         # Arch parameters
