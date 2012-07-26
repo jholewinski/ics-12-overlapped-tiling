@@ -6,13 +6,14 @@ import os.path
 import sys
 import math
 
-program = '../../build.out/ocl-cdsc-tv-update-2d'
+#program = '../../build.out/ocl-cdsc-tv-update-2d'
+program = './ocl-jacobi-2d'
 
 #time_tile_sizes = [2, 3, 4, 5, 6, 7, 8]
 #elems_per_thread = [10]
 
-time_tile_sizes = [2, 4, 6, 8, 10]
-elems_per_thread = [4, 6, 8, 10, 12]
+time_tile_sizes = [2, 4]
+elems_per_thread = [6, 8]
 
 #block_x = range(32, 64+1, 16)
 #block_y = range(8, 16+1, 4)
@@ -30,41 +31,63 @@ min_elapsed = 1000.0
 
 log = open('run.log', 'w')
 
-print('bsx,bsy,tts,elems,elapsed,sim,gflops,occupancy,')
+num_runs = 3
+
+phase_limit = 0
+
+print('bsx,bsy,tts,elems,elapsed,variance,sim,gflops,occupancy,')
 for tts in time_tile_sizes:
   for elems in elems_per_thread:
     for bsx in block_x:
       for bsy in block_y:
         log.write('======== Running S=%d E=%d\n' % (tts, elems))
-        args = '%s -x %d -y %d -w kernel.tmp.cl -n 1024 -t 64 -s %d -e %d' % (program, bsx, bsy, tts, elems)
-        proc = Popen(args.split(), stdout=PIPE, stderr=PIPE)
-        (outs, errs) = proc.communicate()
-        log.write(outs)
-        log.write(errs)
-        if proc.returncode != 0:
-          continue
+        args = '%s -x %d -y %d -w kernel.tmp.cl -n 1024 -t 64 -s %d -e %d -p %d' % (program, bsx, bsy, tts, elems, phase_limit)
 
-        outs = outs.strip()
-        lines = outs.split('\n')
-        program_data = {}
-        for l in lines:
-          data = l.split(':')
-          program_data[data[0].strip()] = data[1].strip()
+        elapsed_times = []
 
-        elapsed_time = float(program_data['Elapsed Time'])
+        for n in range(0, num_runs):
+          proc = Popen(args.split(), stdout=PIPE, stderr=PIPE)
+          (outs, errs) = proc.communicate()
+          log.write(outs)
+          log.write(errs)
+          if proc.returncode != 0:
+            continue
+
+          outs = outs.strip()
+          lines = outs.split('\n')
+          program_data = {}
+          for l in lines:
+            data = l.split(':')
+            program_data[data[0].strip()] = data[1].strip()
+
+          elapsed_times.append(float(program_data['Elapsed Time']))
+
+
+        expect_xsq = 0.0
+        expect_x = 0.0
+
+        for t in elapsed_times:
+          expect_xsq = expect_xsq + t * t
+          expect_x = expect_x + t
+
+        expect_xsq = expect_xsq / float(len(elapsed_times))
+        expect_x = expect_x / float(len(elapsed_times))
+        variance = expect_xsq - expect_x * expect_x
+        elapsed_time = expect_x
+
 
         # Write YAML for simulator
         file_handle = open('tmp.yaml', 'w')
 
-
+        file_handle.write('phase_limit: %d\n' % phase_limit)
 
 
         # J2D
-        #file_handle.write('elems_per_op: 5\n')
-        #file_handle.write('num_arrays: 1\n')
-        #file_handle.write('num_load: 5\n')
-        #file_handle.write('num_store: 1\n')
-        #file_handle.write('ops_per_point: 5\n')
+        file_handle.write('elems_per_op: 5\n')
+        file_handle.write('num_arrays: 1\n')
+        file_handle.write('num_load: 5\n')
+        file_handle.write('num_store: 1\n')
+        file_handle.write('ops_per_point: 5\n')
 
         # P2D
         #file_handle.write('elems_per_op: 9\n')
@@ -74,11 +97,11 @@ for tts in time_tile_sizes:
         #file_handle.write('ops_per_point: 9\n')
 
         # TV Update 2D
-        file_handle.write('elems_per_op: 7\n')
-        file_handle.write('num_arrays: 1\n')
-        file_handle.write('num_load: 7\n')
-        file_handle.write('num_store: 1\n')
-        file_handle.write('ops_per_point: 57\n')
+        #file_handle.write('elems_per_op: 7\n')
+        #file_handle.write('num_arrays: 1\n')
+        #file_handle.write('num_load: 7\n')
+        #file_handle.write('num_store: 1\n')
+        #file_handle.write('ops_per_point: 57\n')
 
         # Rician 2D
         #file_handle.write('elems_per_op: 9\n')
@@ -111,8 +134,8 @@ for tts in time_tile_sizes:
 
 
         file_handle.write('num_sm: %d\n' % num_sm)
-        file_handle.write('mem_latency: 600\n')
-        file_handle.write('bandwidth: 115e9\n')
+        file_handle.write('mem_latency: 500\n')
+        file_handle.write('bandwidth: 120e9\n')
         file_handle.write('cpi: 1\n')
         file_handle.write('global_sync: 3350\n')
         file_handle.write('shared_latency: 32\n')
@@ -205,7 +228,7 @@ for tts in time_tile_sizes:
 
         occupancy = active_warps_per_sm / max_warps_per_sm
 
-        print('%d,%d,%d,%d,%f,%f,%f,%f,' % (bsx, bsy, tts, elems, elapsed_time, sim_time, actual_gflops, occupancy))
+        print('%d,%d,%d,%d,%f,%E,%f,%f,%f,' % (bsx, bsy, tts, elems, elapsed_time, variance, sim_time, actual_gflops, occupancy))
         sys.stdout.flush()
 
 #sorted_data = sorted(data_points, key=lambda pt: pt[3])

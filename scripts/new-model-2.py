@@ -14,6 +14,7 @@ def main():
   handle.close()
 
 
+  phase_limit = int(config['phase_limit'])
   num_load = float(config['num_load'])
   num_store = float(config['num_store'])
   ops_per_point = float(config['ops_per_point'])
@@ -69,8 +70,14 @@ def main():
   print('gld_bw_time: %f' % gld_bw_time)
 
   # Which wins out, latency or bw?
+  if gld_bw_time > gld_time:
+    print('GMEM Winning Factor: BW')
+  else:
+    print('GMEM Winning Factor: Latency')
   gld_time = max(gld_time, gld_bw_time)
 
+  new_phase_2 = mem_latency + (1.0 / words_per_clock) * (gld_words - 1) + 1.0
+  print('new_phase_2: %f' % new_phase_2)
 
   # How long does it take to issue a compute instruction for all warps?
   compute_issue = cpi * active_warps
@@ -124,7 +131,13 @@ def main():
   gst_time = gst_issue #+ mem_latency  # Is this right?
   print('gst_time: %f' % gst_time)
 
-  time = gld_time + compute + sst_time + (time_tile_size-1)*(sld_time + compute + sst_time) + gst_time
+  if phase_limit == 2:
+    #time = gld_time + compute + sst_time
+    time = new_phase_2
+  elif phase_limit == 3:
+    time = gld_time + compute + sst_time + (time_tile_size-1)*(sld_time + compute + sst_time)
+  else:
+    time = gld_time + compute + sst_time + (time_tile_size-1)*(sld_time + compute + sst_time) + gst_time
   print('cycles (1 point): %f' % time)
 
   # Account for spatial tiling

@@ -47,6 +47,8 @@ struct GeneratorParams {
   bool timeOnlyInstr;
   bool timeOnlySMem;
 
+  int32_t phaseLimit;
+
   /**
    * Default constructor.
    */
@@ -66,7 +68,8 @@ struct GeneratorParams {
       blockSizeY(bsy),
       timeOnlyGMem(false),
       timeOnlyInstr(false),
-      timeOnlySMem(false) {
+      timeOnlySMem(false),
+      phaseLimit(0) {
   }
 
   void computeDerived() {
@@ -282,6 +285,10 @@ void Gradient2DGenerator::generateCompute(std::ostream& stream,
     stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
   }
 
+  if(params.phaseLimit == 2) {
+    stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
+  }
+
   if(!params.timeOnlyGMem) {
   for(int32_t t = 1; t < params.timeTileSize; ++t) {
     stream << "  // Time Step " << t << "\n";
@@ -338,6 +345,11 @@ void Gradient2DGenerator::generateCompute(std::ostream& stream,
     }
   }
   }
+
+  if(params.phaseLimit == 3) {
+    stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
+  }
+
 
   if(params.timeOnlyInstr || params.timeOnlySMem) {
     stream << "  if(get_local_id(0) == 1000000) {\n";
@@ -430,6 +442,9 @@ int main(int argc,
     ("time-tile-size,s",
      po::value<int32_t>(&params.timeTileSize)->default_value(1),
      "Set time tile size")
+    ("phase-limit,p",
+     po::value<int32_t>(&params.phaseLimit)->default_value(0),
+     "Stop after a certain kernel phase")
     ("load-kernel,f",
      po::value<std::string>(&kernelFile)->default_value(""),
      "Load kernel from disk")
