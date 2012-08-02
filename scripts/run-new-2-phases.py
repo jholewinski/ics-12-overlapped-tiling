@@ -7,25 +7,25 @@ import sys
 import math
 
 #program = '../../build.out/ocl-cdsc-tv-update-2d'
-program = '../../build.out/ocl-jacobi-3d'
+program = '../../build.out/ocl-jacobi-2d'
 
 #time_tile_sizes = [2, 3, 4, 5, 6, 7, 8]
 #elems_per_thread = [10]
 
-time_tile_sizes = [1, 2, 3]
-elems_per_thread = [4, 6]
+time_tile_sizes = [1]
+elems_per_thread = [1]
 
 #block_x = range(32, 64+1, 16)
 #block_y = range(8, 16+1, 4)
 
 #block_x = range(16, 64+1, 8)
 #block_y = range(8, 16+1, 1)
-block_z = [2, 4, 6]
+block_z = [1]
 
-block_x = [4, 8, 12, 16]
-block_y = [4, 6, 8]
+block_x = [32]
+block_y = [32]
 
-sim_program = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'new-model-2.py')
+sim_program = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'new-model-3.py')
 
 data_points = []
 min_elapsed = 1000.0
@@ -34,7 +34,7 @@ log = open('run.log', 'w')
 
 num_runs = 3
 
-phase_limit = 0
+phase_limit = 2
 
 
 print('bsx,bsy,bsz,tts,elems,phase_limit,elapsed,variance,sim,gflops,occupancy,')
@@ -44,10 +44,13 @@ for tts in time_tile_sizes:
       for bsy in block_y:
         for bsz in block_z:
           log.write('======== Running S=%d E=%d\n' % (tts, elems))
-          args = '%s -x %d -y %d -w kernel.tmp.cl -n 32 -t 64 -s %d -e %d' % (program, bsx, bsy, tts, elems)
+          args = '%s -x %d -y %d -w kernel.tmp.cl -n 32 -t 1 -s %d -e %d' % (program, bsx, bsy, tts, elems)
 
           if bsz > 1:
             args = args + (' -z %d' % bsz)
+
+          if phase_limit > 0:
+            args = args + (' -p %d' % phase_limit)
 
           elapsed_times = []
 
