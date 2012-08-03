@@ -667,7 +667,7 @@ int main(int argc,
   std::vector<cl::Device> devices;
   devices.push_back(context.device());
 
-  result = program.build(devices, "-cl-nv-verbose");
+  result = program.build(devices, "-save-temps");
   if(result != CL_SUCCESS) {
     std::cout << "Source compilation failed.\n";
     std::cout << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(context.device());

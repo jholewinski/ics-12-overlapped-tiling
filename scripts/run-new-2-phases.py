@@ -7,23 +7,23 @@ import sys
 import math
 
 #program = '../../build.out/ocl-cdsc-tv-update-2d'
-program = '../../build.out/ocl-jacobi-3d'
+program = '../../build.out/ocl-jacobi-2d'
 
 #time_tile_sizes = [2, 3, 4, 5, 6, 7, 8]
 #elems_per_thread = [10]
 
-time_tile_sizes = [1, 2, 3]
-elems_per_thread = [4, 6]
+time_tile_sizes = [1, 2, 3, 4, 5, 6]
+elems_per_thread = [4, 6, 8, 10, 12]
 
-#block_x = range(32, 64+1, 16)
-#block_y = range(8, 16+1, 4)
+block_x = range(32, 64+1, 16)
+block_y = range(8, 16+1, 4)
 
 #block_x = range(16, 64+1, 8)
 #block_y = range(8, 16+1, 1)
-block_z = [2, 4, 6]
+block_z = [1]
 
-block_x = [4, 8, 12, 16]
-block_y = [4, 6, 8]
+#block_x = [4, 8, 12, 16]
+#block_y = [4, 6, 8]
 
 sim_program = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'new-model-2.py')
 
@@ -34,7 +34,7 @@ log = open('run.log', 'w')
 
 num_runs = 3
 
-phase_limit = 0
+phase_limit = 3
 
 
 print('bsx,bsy,bsz,tts,elems,phase_limit,elapsed,variance,sim,gflops,occupancy,')
@@ -44,10 +44,13 @@ for tts in time_tile_sizes:
       for bsy in block_y:
         for bsz in block_z:
           log.write('======== Running S=%d E=%d\n' % (tts, elems))
-          args = '%s -x %d -y %d -w kernel.tmp.cl -n 32 -t 64 -s %d -e %d' % (program, bsx, bsy, tts, elems)
+          args = '%s -x %d -y %d -w kernel.tmp.cl -n 1024 -t 64 -s %d -e %d' % (program, bsx, bsy, tts, elems)
 
           if bsz > 1:
             args = args + (' -z %d' % bsz)
+
+          if phase_limit > 0:
+            args = args + (' -p %d' % phase_limit)
 
           elapsed_times = []
 
@@ -136,22 +139,39 @@ for tts in time_tile_sizes:
 
 
           # Arch parameters
-          total_shared_per_sm = 49152.0
-          max_warps_per_sm = 48.0
-          max_threads_per_sm = 1536.0
+
+          # Tesla C2050
+          #total_shared_per_sm = 49152.0
+          #max_warps_per_sm = 48.0
+          #max_threads_per_sm = 1536.0
+          #max_blocks_per_sm = 8.0
+          #num_sm = 14.0
+          #file_handle.write('num_sm: %d\n' % num_sm)
+          #file_handle.write('mem_latency: 380\n')
+          #file_handle.write('bandwidth: 120e9\n')
+          #file_handle.write('cpi: 2\n')
+          #file_handle.write('global_sync: 3350\n')
+          #file_handle.write('shared_latency: 32\n')
+          #file_handle.write('compute_latency: 24\n')
+          #file_handle.write('shared_throughput: 0.5\n')
+          #file_handle.write('clock: 1.15e9\n')
+
+
+          # GTX 280
+          total_shared_per_sm = 16384.0
+          max_warps_per_sm = 32.0
+          max_threads_per_sm = 512.0
           max_blocks_per_sm = 8.0
-          num_sm = 14.0
-
-
+          num_sm = 30.0
           file_handle.write('num_sm: %d\n' % num_sm)
-          file_handle.write('mem_latency: 380\n')
-          file_handle.write('bandwidth: 120e9\n')
-          file_handle.write('cpi: 2\n')
+          file_handle.write('mem_latency: 400\n')
+          file_handle.write('bandwidth: 144e9\n')
+          file_handle.write('cpi: 4\n')
           file_handle.write('global_sync: 3350\n')
           file_handle.write('shared_latency: 32\n')
           file_handle.write('compute_latency: 24\n')
           file_handle.write('shared_throughput: 0.5\n')
-          file_handle.write('clock: 1.15e9\n')
+          file_handle.write('clock: 1.30e9\n')
 
 
           # Program properties
