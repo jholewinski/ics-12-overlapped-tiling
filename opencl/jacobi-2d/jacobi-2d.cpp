@@ -245,6 +245,11 @@ void Jacobi2DGenerator::generateLocals(std::ostream& stream,
     }
   }
 
+  if(params.phaseLimit == 1) {
+    stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
+  }
+
+
   //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStop));\n";
   //stream << "  if(get_global_id(0) == 0) {\n";
   //stream << "    clockData[0] = (clockStop - clockStart);\n";
@@ -667,14 +672,17 @@ int main(int argc,
   std::vector<cl::Device> devices;
   devices.push_back(context.device());
 
-  result = program.build(devices, "-save-temps");
+  result = program.build(devices, "");
   if(result != CL_SUCCESS) {
     std::cout << "Source compilation failed.\n";
+#ifndef SIM_BUILD
     std::cout << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(context.device());
+#endif
     return 1;
   }
 
   // Extract out the register usage
+#ifndef SIM_BUILD
   std::string log =
     program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(context.device());
   boost::regex regExpr("Used ([0-9]+) registers");
@@ -688,10 +696,13 @@ int main(int argc,
   } else {
     printValue("Register Usage", 0);
   }
-
+#endif
+  
   // Extract the kernel
   cl::Kernel kernel(program, "kernel_func", &result);
+#ifndef SIM_BUILD
   CLContext::throwOnError("Failed to extract kernel", result);
+#endif
 
 
   // Allocate host arrays
