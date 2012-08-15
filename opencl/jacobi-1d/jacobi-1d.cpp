@@ -39,12 +39,15 @@ struct GeneratorParams {
   std::string fpSuffix;
 
   // Dummy
-  int32_t     realPerBlockY;
-  int32_t     blockSizeY;
-  int32_t     numBlocksY;
-  int32_t     sharedSizeY;
+  int32_t realPerBlockY;
+  int32_t blockSizeY;
+  int32_t blockSizeZ;
+  int32_t numBlocksY;
+  int32_t sharedSizeY;
 
 
+  int32_t phaseLimit;
+  
 
   /**
    * Default constructor.
@@ -61,7 +64,9 @@ struct GeneratorParams {
       problemSize(ps),
       dataType(type),
       blockSizeX(bsx),
-      blockSizeY(1){
+      blockSizeY(1),
+      blockSizeZ(1),
+      phaseLimit(0) {
   }
 
   void computeDerived() {
@@ -145,7 +150,8 @@ void Jacobi1DGenerator::generateHeader(std::ostream& stream,
   stream << "/* Auto-generated.  Do not edit by hand. */\n";
   stream << "__kernel\n";
   stream << "void kernel_func(__global " << params.dataType << "* input,\n";
-  stream << "                 __global " << params.dataType << "* output) {\n";
+  stream << "                 __global " << params.dataType << "* output,\n";
+  stream << "                 unsigned baseTime) {\n";
 }
 
 void Jacobi1DGenerator::generateFooter(std::ostream& stream) {
@@ -197,11 +203,20 @@ void Jacobi1DGenerator::generateLocals(std::ostream& stream,
     stream << "  " << params.dataType << " local" << i << ";\n";
     stream << "  " << params.dataType << " new" << i << ";\n";
   }
+
+  if(params.phaseLimit == 1) {
+    stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
+  }
 }
 
 void Jacobi1DGenerator::generateCompute(std::ostream& stream,
                                         const GeneratorParams& params) {
 
+  if (params.phaseLimit == 3) {
+    // We only want phase 3, so completely skip phase 2
+    stream << "  if(get_local_id(0) == 100000) {\n";
+  }
+  
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  {\n";
     stream << "    " << params.dataType << " val0, val1, val2;\n";
@@ -227,8 +242,17 @@ void Jacobi1DGenerator::generateCompute(std::ostream& stream,
 
   stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
 
-  for(int32_t t = 1; t < params.timeTileSize; ++t) {
-    stream << "  // Time Step " << t << "\n";
+  if(params.phaseLimit == 2) {
+    stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
+  }
+
+  if (params.phaseLimit == 3) {
+    stream << "  }\n";
+  }
+  
+  stream << "  #pragma unroll\n";
+  stream << "  for(int t = 1; t < " << params.timeTileSize << "; ++t) {\n";
+    stream << "  if (baseTime + t >= " << params.timeSteps << ") break;\n";
     for(int32_t i = 0; i < params.elementsPerThread; ++i) {
       stream << "  {\n";
       stream << "    " << params.dataType << " val0, val1, val2;\n";
@@ -256,7 +280,12 @@ void Jacobi1DGenerator::generateCompute(std::ostream& stream,
       stream << "  local" << i << " = new" << i << ";\n";
     }
     stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
+    stream << "  }\n";
+
+    if(params.phaseLimit == 3) {
+    stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
   }
+    
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  if(writeValid" << i << ") {\n";
     stream << "    *(outputPtr+(" << params.blockSizeX << "*" << i
@@ -323,6 +352,15 @@ int main(int argc,
     ("block-size-x,x",
      po::value<int32_t>(&params.blockSizeX)->default_value(16),
      "Set block size (X)")
+    ("block-size-y,y",
+     po::value<int32_t>(&params.blockSizeY)->default_value(1),
+     "Set block size (Y)")
+    ("block-size-z,z",
+     po::value<int32_t>(&params.blockSizeZ)->default_value(1),
+     "Set block size (Z)")
+    ("phase-limit,p",
+     po::value<int32_t>(&params.phaseLimit)->default_value(0),
+     "Stop after a certain kernel phase")
     ("elements-per-thread,e",
      po::value<int32_t>(&params.elementsPerThread)->default_value(1),
      "Set elements per thread")
@@ -576,12 +614,14 @@ int main(int argc,
 
   double startTime = rtclock();
 
-  for(int t = 0; t < params.timeSteps / params.timeTileSize; ++t) {
+  for(int t = 0; t < params.timeSteps; t += params.timeTileSize) {
 
     // Set kernel arguments
     result = kernel.setArg(0, *inputBuffer);
     CLContext::throwOnError("Failed to set input parameter", result);
     result = kernel.setArg(1, *outputBuffer);
+    CLContext::throwOnError("Failed to set output parameter", result);
+    result = kernel.setArg(2, t);
     CLContext::throwOnError("Failed to set output parameter", result);
 
     // Invoke the kernel

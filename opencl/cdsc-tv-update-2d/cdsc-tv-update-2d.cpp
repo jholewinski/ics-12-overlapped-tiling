@@ -24,6 +24,7 @@ struct GeneratorParams {
   int32_t     elementsPerThread;
   int32_t     blockSizeX;
   int32_t     blockSizeY;
+  int32_t     blockSizeZ;
   int32_t     problemSize;
   std::string dataType;
 
@@ -62,6 +63,7 @@ struct GeneratorParams {
       dataType(type),
       blockSizeX(bsx),
       blockSizeY(bsy),
+      blockSizeZ(1),
       phaseLimit(0) {
   }
 
@@ -159,7 +161,8 @@ void TVUpdate2DGenerator::generateHeader(std::ostream& stream,
   stream << "void kernel_func(__global " << params.dataType << "* input,\n";
   stream << "                 __global " << params.dataType << "* V,\n";
   stream << "                 __global " << params.dataType << "* F,\n";
-  stream << "                 __global " << params.dataType << "* output) {\n";
+  stream << "                 __global " << params.dataType << "* output,\n";
+  stream << "                 unsigned baseTime) {\n";
 }
 
 void TVUpdate2DGenerator::generateFooter(std::ostream& stream) {
@@ -320,9 +323,10 @@ void TVUpdate2DGenerator::generateCompute(std::ostream& stream,
   if (params.phaseLimit == 3) {
     stream << "  }\n";
   }  
-  
-  for(int32_t t = 1; t < params.timeTileSize; ++t) {
-    stream << "  // Time Step " << t << "\n";
+
+  stream << "  #pragma unroll\n";
+  stream << "  for(int t = 1; t < " << params.timeTileSize << "; ++t) {\n";
+  stream << "  if (baseTime + t >= " << params.timeSteps << ") break;\n";
     for(int32_t i = 0; i < params.elementsPerThread; ++i) {
       stream << "  {\n";
       stream << "    " << params.dataType
@@ -389,7 +393,7 @@ void TVUpdate2DGenerator::generateCompute(std::ostream& stream,
       stream << "  local" << i << " = new" << i << ";\n";
     }
     stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
-  }
+    stream << "  }\n";
 
   if(params.phaseLimit == 3) {
     stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
@@ -742,7 +746,7 @@ int main(int argc,
 
   double startTime = rtclock();
 
-  for(int t = 0; t < params.timeSteps / params.timeTileSize; ++t) {
+  for(int t = 0; t < params.timeSteps; t += params.timeTileSize) {
 
     // Set kernel arguments
     result = kernel.setArg(0, *inputBuffer);
@@ -752,6 +756,8 @@ int main(int argc,
     result = kernel.setArg(2, deviceF);
     CLContext::throwOnError("Failed to set input parameter", result);
     result = kernel.setArg(3, *outputBuffer);
+    CLContext::throwOnError("Failed to set output parameter", result);
+    result = kernel.setArg(4, t);
     CLContext::throwOnError("Failed to set output parameter", result);
 
     // Invoke the kernel

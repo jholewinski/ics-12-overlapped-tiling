@@ -308,6 +308,7 @@ void Gradient2DGenerator::generateCompute(std::ostream& stream,
   if(!params.timeOnlyGMem) {
     stream << "  #pragma unroll\n";
     stream << "  for(int t = 1; t < " << params.timeTileSize << "; ++t) {\n";
+    stream << "  if (baseTime + t >= " << params.timeSteps << ") break;\n";
     for(int32_t i = 0; i < params.elementsPerThread; ++i) {
       stream << "  {\n";
       stream << "    " << params.dataType
@@ -742,12 +743,14 @@ int main(int argc,
 
   double startTime = rtclock();
 
-  for(int t = 0; t < params.timeSteps / params.timeTileSize; ++t) {
+  for(int t = 0; t < params.timeSteps; t += params.timeTileSize) {
 
     // Set kernel arguments
     result = kernel.setArg(0, *inputBuffer);
     CLContext::throwOnError("Failed to set input parameter", result);
     result = kernel.setArg(1, *outputBuffer);
+    CLContext::throwOnError("Failed to set output parameter", result);
+    result = kernel.setArg(2, t);
     CLContext::throwOnError("Failed to set output parameter", result);
 
     // Invoke the kernel

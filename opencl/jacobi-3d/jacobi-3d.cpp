@@ -160,7 +160,8 @@ void Jacobi3DGenerator::generateHeader(std::ostream& stream,
   stream << "/* Auto-generated.  Do not edit by hand. */\n";
   stream << "__kernel\n";
   stream << "void kernel_func(__global " << params.dataType << "* input,\n";
-  stream << "                 __global " << params.dataType << "* output) {\n";
+  stream << "                 __global " << params.dataType << "* output,\n";
+  stream << "                 unsigned baseTime) {\n";
 }
 
 void Jacobi3DGenerator::generateFooter(std::ostream& stream) {
@@ -278,8 +279,9 @@ void Jacobi3DGenerator::generateCompute(std::ostream& stream,
 
   stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
 
-  for(int32_t t = 1; t < params.timeTileSize; ++t) {
-    stream << "  // Time Step " << t << "\n";
+  stream << "  #pragma unroll\n";
+  stream << "  for(int32_t t = 1; t < " << params.timeTileSize << "; ++t) {\n";
+    stream << "  if (baseTime + t >= " << params.timeSteps << ") break;\n";
     for(int32_t i = 0; i < params.elementsPerThread; ++i) {
       stream << "  {\n";
       stream << "    " << params.dataType
@@ -312,13 +314,13 @@ void Jacobi3DGenerator::generateCompute(std::ostream& stream,
              << "+" << i
              << "+1][get_local_id(0)+1];\n";
       stream << "    // Forwards\n";
-      stream << "    val4 = buffer[get_local_id(2)+2][get_local_id(1)*"
+      stream << "    val6 = buffer[get_local_id(2)+2][get_local_id(1)*"
              << params.elementsPerThread
              << "+" << i
              << "+1][get_local_id(0)+1];\n";
       stream << "    " << params.dataType
              << " result = 0.143" << params.fpSuffix
-             << " * (val0+val1+val2+val3+val4);\n";
+             << " * (val0+val1+val2+val3+val4+val5+val6);\n";
       stream << "    result = (valid" << i << ") ? result : 0.0"
              << params.fpSuffix << ";\n";
       stream << "    new" << i << " = result;\n";
@@ -333,7 +335,7 @@ void Jacobi3DGenerator::generateCompute(std::ostream& stream,
       stream << "  local" << i << " = new" << i << ";\n";
     }
     stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
-  }
+    stream << "  }\n";
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  if(writeValid" << i << " && writeValidX) {\n";
     stream << "    *(outputPtr+(" << params.paddedSize << "*" << i
@@ -675,12 +677,14 @@ int main(int argc,
 
   double startTime = rtclock();
 
-  for(int t = 0; t < params.timeSteps / params.timeTileSize; ++t) {
+  for(int t = 0; t < params.timeSteps; t += params.timeTileSize) {
 
     // Set kernel arguments
     result = kernel.setArg(0, *inputBuffer);
     CLContext::throwOnError("Failed to set input parameter", result);
     result = kernel.setArg(1, *outputBuffer);
+    CLContext::throwOnError("Failed to set output parameter", result);
+    result = kernel.setArg(2, t);
     CLContext::throwOnError("Failed to set output parameter", result);
   
     // Invoke the kernel
