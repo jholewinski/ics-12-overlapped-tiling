@@ -5,117 +5,171 @@ from benchrunner.benchmarks import run_benchmark
 import sys
 import yaml
 
-# Jacobi 2D Input
-#phase2_global_loads = 5.0
-#phase2_shared_loads = 0.0
-#compute_per_point = 5.0
-#phase3_shared_loads = 5.0
-#phase4_global_stores = 1.0
-#shared_stores = 1.0
-#num_fields = 1.0
-#data_size = 4.0
-#executable = '../../build.out/ocl-jacobi-2d'
-#dim = 2
+
+if len(sys.argv) != 3:
+    print('Usage: %s <arch> <prog>\n' % sys.argv[0])
+    exit(1)
+
+arch = sys.argv[1]
+prog = sys.argv[2]
 
 
-# Jacobi 1D Input
-phase2_global_loads = 3.0
-phase2_shared_loads = 0.0
-compute_per_point = 3.0
-phase3_shared_loads = 3.0
-phase4_global_stores = 1.0
-shared_stores = 1.0
-num_fields = 1.0
-data_size = 4.0
-executable = '../../build.out/ocl-jacobi-1d'
-dim = 1
+if prog == 'j2d':
+    # Jacobi 2D Input
+    phase2_global_loads = 5.0
+    phase2_shared_loads = 0.0
+    compute_per_point = 5.0
+    phase3_shared_loads = 5.0
+    phase4_global_stores = 1.0
+    shared_stores = 1.0
+    num_fields = 1.0
+    data_size = 4.0
+    executable = '../../build.out/ocl-jacobi-2d'
+    dim = 2
+elif prog == 'j1d':
+    # Jacobi 1D Input
+    phase2_global_loads = 3.0
+    phase2_shared_loads = 0.0
+    compute_per_point = 3.0
+    phase3_shared_loads = 3.0
+    phase4_global_stores = 1.0
+    shared_stores = 1.0
+    num_fields = 1.0
+    data_size = 4.0
+    executable = '../../build.out/ocl-jacobi-1d'
+    dim = 1
+elif prog == 'p2d':
+    # Poisson 2D Input
+    phase2_global_loads = 9.0
+    phase2_shared_loads = 0.0
+    compute_per_point = 9.0
+    phase3_shared_loads = 9.0
+    phase4_global_stores = 1.0
+    shared_stores = 1.0
+    num_fields = 1.0
+    data_size = 4.0
+    executable = '../../build.out/ocl-poisson-2d'
+    dim = 2
+elif prog == 'tv2d':
+    # CDSC TV Update 2D Input
+    phase2_global_loads = 7.0
+    phase2_shared_loads = 0.0
+    compute_per_point = 59.0
+    phase3_shared_loads = 7.0
+    phase4_global_stores = 1.0
+    shared_stores = 1.0
+    num_fields = 1.0
+    data_size = 4.0
+    executable = '../../build.out/ocl-cdsc-tv-update-2d'
+    dim = 2
+elif prog == 'g2d':
+    # Gradient 2D
+    phase2_global_loads = 5.0
+    phase2_shared_loads = 0.0
+    compute_per_point = 12.0
+    phase3_shared_loads = 5.0
+    phase4_global_stores = 1.0
+    shared_stores = 1.0
+    num_fields = 1.0
+    data_size = 4.0
+    executable = '../../build.out/ocl-gradient-2d'
+    dim = 2
+elif prog == 'fdtd2d':
+    # FDTD 2D Input
+    phase2_global_loads = 7.0
+    phase2_shared_loads = 4.0
+    compute_per_point = 11.0
+    phase3_shared_loads = 11.0  
+    phase4_global_stores = 3.0
+    shared_stores = 3.0
+    num_fields = 3.0
+    data_size = 4.0
+    executable = '../../build.out/ocl-fdtd-2d'
+    dim = 2
+elif prog == 'rician2d':
+    # Rician 2D
+    phase2_global_loads = 9.0
+    phase2_shared_loads = 0.0
+    compute_per_point = 42.0
+    phase3_shared_loads = 9.0
+    phase4_global_stores = 1.0
+    shared_stores = 1.0
+    num_fields = 1.0
+    data_size = 4.0
+    executable = '../../build.out/ocl-rician-denoise-2d'
+    dim = 2
+else:
+    print('Unknown program')
+    exit(1)
 
-
-
-# Poisson 2D Input
-#phase2_global_loads = 9.0
-#phase2_shared_loads = 0.0
-#compute_per_point = 9.0
-#phase3_shared_loads = 9.0
-#phase4_global_stores = 1.0
-#shared_stores = 1.0
-#num_fields = 1.0
-#data_size = 4.0
-#executable = '../../build.out/ocl-poisson-2d'
-#dim = 2
-
-
-# CDSC TV Update 2D Input
-#phase2_global_loads = 7.0
-#phase2_shared_loads = 0.0
-#compute_per_point = 59.0
-#phase3_shared_loads = 7.0
-#phase4_global_stores = 1.0
-#shared_stores = 1.0
-#num_fields = 1.0
-#data_size = 4.0
-#executable = '../../build.out/ocl-cdsc-tv-update-2d'
-#dim = 2
-
-
-# Gradient 2D
-#phase2_global_loads = 5.0
-#phase2_shared_loads = 0.0
-#compute_per_point = 12.0
-#phase3_shared_loads = 5.0
-#phase4_global_stores = 1.0
-#shared_stores = 1.0
-#num_fields = 1.0
-#data_size = 4.0
-#executable = '../../build.out/ocl-gradient-2d'
-#dim = 2
-
-
-# FDTD 2D Input
-#phase2_global_loads = 7.0
-#phase2_shared_loads = 4.0
-#compute_per_point = 11.0
-#phase3_shared_loads = 11.0
-#phase4_global_stores = 3.0
-#shared_stores = 3.0
-#num_fields = 3.0
-#data_size = 4.0
-#executable = '../../build.out/ocl-fdtd-2d'
-#dim = 2
-
-
-# Rician 2D
-#phase2_global_loads = 9.0
-#phase2_shared_loads = 0.0
-#compute_per_point = 42.0
-#phase3_shared_loads = 9.0
-#phase4_global_stores = 1.0
-#shared_stores = 1.0
-#num_fields = 1.0
-#data_size = 4.0
-#executable = '../../build.out/ocl-rician-denoise-2d'
-#dim = 2
 
 
 # Machine Specs
-total_shared = 49152.0
-max_warps_per_sm = 48.0
-max_threads_per_sm = 1536.0
-max_blocks_per_sm = 8.0
-num_sm = 14.0
-gmem_bandwidth = 120e9
-smem_bandwidth = 147.2e9
-cpi = 1.0
-clock = 1.15e9
+if arch == 'fermi':
+    total_shared = 49152.0
+    max_warps_per_sm = 48.0
+    max_threads_per_sm = 1536.0
+    max_blocks_per_sm = 8.0
+    num_sm = 14.0
+    gmem_bandwidth = 120e9
+    smem_bandwidth = 147.2e9
+    cpi = 1.0
+    clock = 1.15e9
 
-c_load = 2.0
-c_op = 1.0
-B_gmem = 18.0
-B_smem = 3.0
-L_gmem = 450.0
-L_smem = 32.0
+    c_load = 2.0
+    c_op = 1.0
+    B_gmem = 18.0
+    B_smem = 3.0
+    L_gmem = 450.0
+    L_smem = 32.0
 
-launch_penalty = 1000
+    launch_penalty = 1000
+
+    warp_size = 32.0
+
+elif arch == 'gt200':
+    total_shared = 16384.0
+    max_warps_per_sm = 32.0
+    max_threads_per_sm = 1024.0
+    max_blocks_per_sm = 8.0
+    num_sm = 30.0
+    gmem_bandwidth = 144e9
+    smem_bandwidth = 147.2e9
+    cpi = 4.0
+    clock = 1.30e9
+
+    c_load = 4.0
+    c_op = 4.0
+    B_gmem = 40.0
+    B_smem = 16.0
+    L_gmem = 750.0
+    L_smem = 32.0
+
+    launch_penalty = 2000
+
+    warp_size = 32.0
+
+elif arch == 'gcn':
+    total_shared = 32768.0
+    max_warps_per_sm = 16.0
+    max_threads_per_sm = 1024.0
+    max_blocks_per_sm = 8.0
+    num_sm = 32.0
+    gmem_bandwidth = 144e9
+    smem_bandwidth = 147.2e9
+    cpi = 4.0
+    clock = 1.30e9
+
+    c_load = 4.0
+    c_op = 4.0
+    B_gmem = 16.0
+    B_smem = 8.0
+    L_gmem = 550.0
+    L_smem = 32.0
+
+    launch_penalty = 2000
+
+    warp_size = 64.0
 
 
 # Configuration Space
@@ -144,7 +198,8 @@ else:
 time_tile_size = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 elems_per_thread = [2, 4, 6, 8]
 
-phases = [3]
+phases = [0]
+
 
 
 
@@ -167,6 +222,11 @@ for h in headers:
     sys.stdout.write('%s,' % h)
 sys.stdout.write('\n')
 sys.stdout.flush()
+
+
+min_real = 100000.0
+
+results = []
 
 
 # Iterate configuration space
@@ -208,7 +268,7 @@ for (x, y, z, t, e, phase_limit) in configs:
     """
     Derived Stats
     """
-    warps_per_block = x*y*z/32.0
+    warps_per_block = x*y*z/warp_size
     shared_per_block = (x+2.0) * (y+2.0) * (z+2.0) * 4.0  # ESTIMATE
     blocks_per_sm = min(
         math.floor(max_warps_per_sm / warps_per_block),
@@ -247,13 +307,14 @@ for (x, y, z, t, e, phase_limit) in configs:
     """    
 
     # Cache Model
-    p2_glb = 5.0*e
-    p2_glb = e+4.0
-    p2_shd = 5.0*e - p2_glb
-
-    # No Cache
-    #p2_glb = phase2_global_loads * e
-    #p2_shd = phase2_shared_loads * e
+    if arch == 'fermi' or arch == 'gcn':
+        p2_glb = 5.0*e
+        p2_glb = e+4.0
+        p2_shd = 5.0*e - p2_glb
+    else:
+        # No Cache
+        p2_glb = phase2_global_loads * e
+        p2_shd = phase2_shared_loads * e
 
     k_op = compute_per_point * e
 
@@ -302,6 +363,9 @@ for (x, y, z, t, e, phase_limit) in configs:
     else:
         pts_per_clk = 0.0
 
+    min_real = min(min_real, real_elapsed)
+
+    results.append([x, y, z, t, e, real_elapsed, sim_elapsed, pts_per_clk])
 
     """
     Print Results
@@ -310,3 +374,18 @@ for (x, y, z, t, e, phase_limit) in configs:
         sys.stdout.write('%s,' % str(locals()[h]))
     sys.stdout.write('\n')
     sys.stdout.flush()
+
+
+# Find best results
+sorted_results = sorted(results, key=lambda x: x[7])
+sorted_results.reverse()
+
+
+for pt in sorted_results[:3]:
+    (x, y, z, t, e, real, sim, pts_per_clk) = pt
+    rel_time = real / min_real
+    sys.stderr.write('%s: %f\n' % (str(pt), rel_time))
+    sys.stderr.flush()
+
+
+
