@@ -25,6 +25,7 @@ struct GeneratorParams {
   int32_t     elementsPerThread;
   int32_t     blockSizeX;
   int32_t     blockSizeY;
+  int32_t     blockSizeZ;
   int32_t     problemSize;
   std::string dataType;
 
@@ -68,6 +69,7 @@ struct GeneratorParams {
       breakThreads(bt),
       blockSizeX(bsx),
       blockSizeY(bsy),
+      blockSizeZ(1),
       timeOnlyGMem(false),
       timeOnlyInstr(false),
       timeOnlySMem(false),
@@ -169,7 +171,8 @@ void Jacobi2DGenerator::generateHeader(std::ostream& stream,
   stream << "__kernel\n";
   stream << "void kernel_func(__global " << params.dataType << "* input,\n";
   stream << "                 __global " << params.dataType << "* output,\n";
-  stream << "                 __global unsigned int* clockData) {\n";
+  stream << "                 __global unsigned int* clockData,\n";
+  stream << "                 unsigned baseTime) {\n";
 }
 
 void Jacobi2DGenerator::generateFooter(std::ostream& stream) {
@@ -261,6 +264,12 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
 
   //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStart));\n";
 
+
+  if (params.phaseLimit == 3) {
+    // We only want phase 3, so completely skip phase 2
+    stream << "  if(get_local_id(0) == 100000) {\n";
+  }
+  
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  {\n";
     if(!params.timeOnlySMem) {
@@ -319,6 +328,10 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
     stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
   }
 
+  if (params.phaseLimit == 3) {
+    stream << "  }\n";
+  }
+
   //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStop));\n";
   //stream << "  if(get_global_id(0) == 0) {\n";
   //stream << "    clockData[1] = (clockStop - clockStart);\n";
@@ -327,20 +340,22 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
   //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStart));\n";
 
   if(!params.timeOnlyGMem) {
-  for(int32_t t = 1; t < params.timeTileSize; ++t) {
-    stream << "  // Time Step " << t << "\n";
+    stream << "  #pragma unroll\n";
+    stream << "  for (int t = 1; t < " << params.timeTileSize << "; ++t) {\n";
+    //stream << "  // Time Step " << t << "\n";
     if(params.breakThreads) {
-      stream << "  if(get_local_id(0) >= " << t
+      stream << "  if(get_local_id(0) >= t"
              << " && get_local_id(0) < get_local_size(0)-"
-             << t << ")\n";
+             << "t)\n";
     }
+    stream << "  if (baseTime + t >= " << params.timeSteps << ") break;\n";
     stream << "  {\n";
     for(int32_t i = 0; i < params.elementsPerThread; ++i) {
       if(params.breakThreads) {
         stream << "  if(get_local_id(1)*" << params.elementsPerThread << "+" << i
-               << " >= " << t << " && get_local_id(1)*"
+               << " >= " << "t && get_local_id(1)*"
                << params.elementsPerThread << "+" << i << " < get_local_size(1)*"
-               << params.elementsPerThread << "-" << t << ")\n";
+               << params.elementsPerThread << "-" << "t)\n";
       }
       stream << "  {\n";
       stream << "    " << params.dataType << " val0, val1, val2, val3, val4;\n";
@@ -400,7 +415,7 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
       stream << "else { return; }\n";
     }
   }
-  }
+  stream << "  }\n";
 
   //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStop));\n";
   //stream << "  if(get_global_id(0) == 0) {\n";
@@ -506,6 +521,9 @@ int main(int argc,
     ("block-size-y,y",
      po::value<int32_t>(&params.blockSizeY)->default_value(16),
      "Set block size (Y)")
+    ("block-size-z,z",
+     po::value<int32_t>(&params.blockSizeZ)->default_value(1),
+     "Set block size (Z)")
     ("elements-per-thread,e",
      po::value<int32_t>(&params.elementsPerThread)->default_value(1),
      "Set elements per thread")
@@ -799,7 +817,7 @@ int main(int argc,
 
   double startTime = rtclock();
 
-  for(int t = 0; t < params.timeSteps / params.timeTileSize; ++t) {
+  for(int t = 0; t < params.timeSteps; t += params.timeTileSize) {
 
     // Set kernel arguments
     result = kernel.setArg(0, *inputBuffer);
@@ -807,6 +825,8 @@ int main(int argc,
     result = kernel.setArg(1, *outputBuffer);
     CLContext::throwOnError("Failed to set output parameter", result);
     result = kernel.setArg(2, deviceClock);
+    CLContext::throwOnError("Failed to set output parameter", result);
+    result = kernel.setArg(3, t);
     CLContext::throwOnError("Failed to set output parameter", result);
 
     // Invoke the kernel

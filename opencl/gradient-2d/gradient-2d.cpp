@@ -25,6 +25,7 @@ struct GeneratorParams {
   int32_t     elementsPerThread;
   int32_t     blockSizeX;
   int32_t     blockSizeY;
+  int32_t     blockSizeZ;
   int32_t     problemSize;
   std::string dataType;
 
@@ -66,6 +67,7 @@ struct GeneratorParams {
       dataType(type),
       blockSizeX(bsx),
       blockSizeY(bsy),
+      blockSizeZ(1),
       timeOnlyGMem(false),
       timeOnlyInstr(false),
       timeOnlySMem(false),
@@ -154,7 +156,8 @@ void Gradient2DGenerator::generateHeader(std::ostream& stream,
   stream << "#define SQR(x) ((x)*(x))\n";
   stream << "__kernel\n";
   stream << "void kernel_func(__global " << params.dataType << "* input,\n";
-  stream << "                 __global " << params.dataType << "* output) {\n";
+  stream << "                 __global " << params.dataType << "* output,\n";
+  stream << "                 unsigned baseTime) {\n";
 }
 
 void Gradient2DGenerator::generateFooter(std::ostream& stream) {
@@ -224,11 +227,20 @@ void Gradient2DGenerator::generateLocals(std::ostream& stream,
       stream << "  " << params.dataType << " test4_" << i << ";\n";
     }
   }
+
+  if(params.phaseLimit == 1) {
+    stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
+  }
 }
 
 void Gradient2DGenerator::generateCompute(std::ostream& stream,
                                           const GeneratorParams& params) {
 
+  if (params.phaseLimit == 3) {
+    // We only want phase 3, so completely skip phase 2
+    stream << "  if(get_local_id(0) == 100000) {\n";
+  }
+  
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  {\n";
     if(!params.timeOnlySMem) {
@@ -289,9 +301,13 @@ void Gradient2DGenerator::generateCompute(std::ostream& stream,
     stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
   }
 
+  if (params.phaseLimit == 3) {
+    stream << "  }\n";
+  }
+  
   if(!params.timeOnlyGMem) {
-  for(int32_t t = 1; t < params.timeTileSize; ++t) {
-    stream << "  // Time Step " << t << "\n";
+    stream << "  #pragma unroll\n";
+    stream << "  for(int t = 1; t < " << params.timeTileSize << "; ++t) {\n";
     for(int32_t i = 0; i < params.elementsPerThread; ++i) {
       stream << "  {\n";
       stream << "    " << params.dataType
@@ -344,7 +360,7 @@ void Gradient2DGenerator::generateCompute(std::ostream& stream,
       }
     }
   }
-  }
+  stream << "  }\n";
 
   if(params.phaseLimit == 3) {
     stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
@@ -436,6 +452,9 @@ int main(int argc,
     ("block-size-y,y",
      po::value<int32_t>(&params.blockSizeY)->default_value(16),
      "Set block size (Y)")
+    ("block-size-z,z",
+     po::value<int32_t>(&params.blockSizeZ)->default_value(1),
+     "Set block size (Z)")
     ("elements-per-thread,e",
      po::value<int32_t>(&params.elementsPerThread)->default_value(1),
      "Set elements per thread")

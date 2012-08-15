@@ -244,11 +244,20 @@ void FDTD2DGenerator::generateLocals(std::ostream& stream,
     stream << "  " << params.dataType << " localHZ" << i << ";\n";
     stream << "  " << params.dataType << " newHZ" << i << ";\n";
   }
+
+  if(params.phaseLimit == 1) {
+    stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
+  }
 }
 
 void FDTD2DGenerator::generateCompute(std::ostream& stream,
                                       const GeneratorParams& params) {
 
+  if (params.phaseLimit == 3) {
+    // We only want phase 3, so completely skip phase 2
+    stream << "  if(get_local_id(0) == 100000) {\n";
+  }
+  
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  {\n";
     stream << "    " << params.dataType
@@ -318,6 +327,10 @@ void FDTD2DGenerator::generateCompute(std::ostream& stream,
 
   if(params.phaseLimit == 2) {
     stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
+  }
+
+  if (params.phaseLimit == 3) {
+    stream << "  }\n";
   }
   
   for(int32_t t = 1; t < params.timeTileSize; ++t) {

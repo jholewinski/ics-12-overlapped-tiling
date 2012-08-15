@@ -12,8 +12,8 @@ program = '../../build.out/ocl-jacobi-2d'
 #time_tile_sizes = [2, 3, 4, 5, 6, 7, 8]
 #elems_per_thread = [10]
 
-time_tile_sizes = [1, 2, 3, 4]
-elems_per_thread = [6, 8]
+time_tile_sizes = [4]
+elems_per_thread = [8]
 
 #block_x = range(32, 64+1, 16)
 #block_y = range(8, 16+1, 4)
@@ -22,8 +22,8 @@ elems_per_thread = [6, 8]
 #block_y = range(8, 16+1, 1)
 block_z = [1]
 
-block_x = [32, 64]
-block_y = [4, 8]
+block_x = [32, 48, 64, 96]
+block_y = [4, 5, 6, 7]
 
 sim_program = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'new-model-2.py')
 
@@ -34,7 +34,7 @@ log = open('run.log', 'w')
 
 num_runs = 3
 
-phases = [0, 1, 2, 3]
+phases = [0]
 
 
 print('bsx,bsy,bsz,tts,elems,phase_limit,elapsed,variance,sim,gflops,occupancy,')
@@ -45,7 +45,7 @@ for p in phases:
         for bsy in block_y:
           for bsz in block_z:
             log.write('======== Running S=%d E=%d\n' % (tts, elems))
-            args = '%s -x %d -y %d -w kernel.tmp.cl -n 128 -t 16 -s %d -e %d' % (program, bsx, bsy, tts, elems)
+            args = '%s -x %d -y %d -w kernel.tmp.cl -n 2048 -t 64 -s %d -e %d' % (program, bsx, bsy, tts, elems)
 
             if bsz > 1:
               args = args + (' -z %d' % bsz)
@@ -148,13 +148,13 @@ for p in phases:
 
 
             file_handle.write('num_sm: %d\n' % num_sm)
-            file_handle.write('mem_latency: 380\n')
+            file_handle.write('mem_latency: 500\n')
             file_handle.write('bandwidth: 120e9\n')
-            file_handle.write('cpi: 2\n')
-            file_handle.write('global_sync: 3350\n')
+            file_handle.write('cpi: 1\n')
+            file_handle.write('global_sync: 3315\n')
             file_handle.write('shared_latency: 32\n')
-            file_handle.write('compute_latency: 24\n')
-            file_handle.write('shared_throughput: 0.5\n')
+            file_handle.write('compute_latency: 32\n')
+            file_handle.write('shared_throughput: 1.00\n')
             file_handle.write('clock: 1.15e9\n')
 
 
@@ -180,7 +180,7 @@ for p in phases:
             blocks_per_sm = min(
               math.floor(max_warps_per_sm / num_warps_per_block),
               math.floor(total_shared_per_sm / max(1, shared_size_per_block)))
-            blocks_per_sm = max(blocks_per_sm, 1.0)
+            blocks_per_sm = max(min(blocks_per_sm, max_blocks_per_sm), 1.0)
 
             # Now how many warps is that?
             active_warps_per_sm = num_warps_per_block * blocks_per_sm

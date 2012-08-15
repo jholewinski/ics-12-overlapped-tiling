@@ -22,7 +22,7 @@ inline double rtclock() {
 
 template <typename T>
 void printValue(const char* name, T value) {
-  std::cout.width(20);
+  //std::cout.width(20);
   std::cout << name << ": " << value << "\n";
 }
 

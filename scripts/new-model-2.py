@@ -64,9 +64,17 @@ def main():
   print('gld_time: %f' % gld_time)
 
   # How long will it take to transfer all of the needed data?
-  gld_words = num_load * active_warps * 32
+  gld_words = num_load * elems_per_thread * active_warps * 32
 
-  gld_bw_time = math.ceil(gld_words / words_per_clock)
+  cache_hit_rate = 0.37
+  if elems_per_thread == 4:
+    cache_hit_rate = 0.5
+  elif elems_per_thread == 8:
+    cache_hit_rate = 0.32
+
+  #cache_hit_rate = 0.0
+
+  gld_bw_time = math.ceil(gld_words*(1.0-cache_hit_rate) / words_per_clock)
   print('gld_bw_time: %f' % gld_bw_time)
 
   # Which wins out, latency or bw?
@@ -74,7 +82,8 @@ def main():
     print('GMEM Winning Factor: BW')
   else:
     print('GMEM Winning Factor: Latency')
-  gld_time = max(gld_time, gld_bw_time)
+  #gld_time = max(gld_time, gld_bw_time)
+  gld_time = gld_time + gld_bw_time
 
   new_phase_2 = mem_latency + (1.0 / words_per_clock) * (gld_words - 1) + 1.0
   print('new_phase_2: %f' % new_phase_2)
@@ -90,10 +99,11 @@ def main():
   # What is the total compute time?
   #compute = (compute_issue + active_warps*compute_stall) * ops_per_point
   compute = compute_issue * ops_per_point + compute_stall * ops_per_point + compute_latency
+  compute = compute * elems_per_thread
   print('compute: %f' % compute)
 
   # Estimate shared-st time
-  sst_issue = num_store * cpi * active_warps
+  sst_issue = num_store * elems_per_thread * cpi * active_warps * 14.0  # Shared store latency
   print('sst_issue: %f' % sst_issue)
 
   # Assume no wait on write
@@ -101,7 +111,7 @@ def main():
   print('sst_time: %f' % sst_time)
 
   # Estimate shared-ld time
-  sld_issue = num_load * cpi * active_warps
+  sld_issue = num_load * elems_per_thread * cpi * active_warps
   print('sld_issue: %f' % sld_issue)
 
   sld_first_time = num_load * cpi + shared_latency
@@ -117,15 +127,16 @@ def main():
 
   # What is the throughput constraint?
   # It takes 2 cycles to service a load
-  sld_throughput_cycles = (1.0/shared_throughput) * num_load * active_warps
+  sld_throughput_cycles = (1.0/shared_throughput) * num_load * elems_per_thread * active_warps
   print('sld_throughput_cycles: %f' % sld_throughput_cycles)
 
   # Account for bandwidth
-  sld_time = max(sld_time, sld_throughput_cycles)
+  #sld_time = max(sld_time, sld_throughput_cycles)
+  sld_time = sld_time + sld_throughput_cycles
   print('sld_time: %f' % sld_time)
 
   # Estimate global-st time
-  gst_issue = num_store * cpi * active_warps
+  gst_issue = num_store * elems_per_thread * cpi * active_warps
   print('gst_issue: %f' % gst_issue)
 
   gst_time = gst_issue #+ mem_latency  # Is this right?
@@ -140,9 +151,13 @@ def main():
     time = gld_time + compute + sst_time + (time_tile_size-1)*(sld_time + compute + sst_time) + gst_time
   print('cycles (1 point): %f' % time)
 
+
+  #phase
+
+
   # Account for spatial tiling
-  time = time * elems_per_thread
-  print('cycles (E points): %f' % time)
+  #time = time * elems_per_thread
+  #print('cycles (E points): %f' % time)
 
   time = time * stages_per_sm
   print('stages_per_sm: %f' % stages_per_sm)
