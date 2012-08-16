@@ -390,6 +390,11 @@ sorted_results = sorted(results, key=lambda x: x[6])
 #sorted_results.reverse()
 
 
+max_overhead = 0.0
+for (_, _, _, _, _, real, _, _) in results:
+    overhead = real / min_real
+    max_overhead = max(max_overhead, overhead)
+
 for pt in sorted_results[:3]:
     (x, y, z, t, e, real, sim, pts_per_clk) = pt
     rel_time = real / min_real
@@ -399,8 +404,8 @@ for pt in sorted_results[:3]:
 # Print stats
 avg_error = avg_error / float(len(results))
 
-sys.stderr.write('# Average Error: %f\n' % avg_error)
-sys.stderr.write('# Maximum Error: %f\n' % max_error)
-sys.stderr.write('# Minimum Error: %f\n' % min_error)
-
+sys.stderr.write('# Maximum Overhead: %f\n' % max_overhead)
+sys.stderr.write('# Average Error:    %f\n' % avg_error)
+sys.stderr.write('# Maximum Error:    %f\n' % max_error)
+sys.stderr.write('# Minimum Error:    %f\n' % min_error)
 
