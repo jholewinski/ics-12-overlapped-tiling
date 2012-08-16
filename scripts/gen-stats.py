@@ -228,6 +228,9 @@ min_real = 100000.0
 
 results = []
 
+avg_error = 0.0
+min_error = 100000.0
+max_error = -100000.0
 
 # Iterate configuration space
 for (x, y, z, t, e, phase_limit) in configs:
@@ -365,6 +368,12 @@ for (x, y, z, t, e, phase_limit) in configs:
 
     min_real = min(min_real, real_elapsed)
 
+    error = (sim_elapsed - real_elapsed) / real_elapsed
+    avg_error = avg_error + error
+
+    min_error = min(min_error, error)
+    max_error = max(max_error, error)
+
     results.append([x, y, z, t, e, real_elapsed, sim_elapsed, pts_per_clk])
 
     """
@@ -387,5 +396,11 @@ for pt in sorted_results[:3]:
     sys.stderr.write('%s: %f\n' % (str(pt), rel_time))
     sys.stderr.flush()
 
+# Print stats
+avg_error = avg_error / float(len(results))
+
+sys.stderr.write('# Average Error: %f\n' % avg_error)
+sys.stderr.write('# Maximum Error: %f\n' % max_error)
+sys.stderr.write('# Minimum Error: %f\n' % min_error)
 
 
