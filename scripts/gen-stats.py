@@ -14,6 +14,10 @@ arch = sys.argv[1]
 prog = sys.argv[2]
 
 
+sys.stderr.write('Launch: %s\n' % str(sys.argv))
+sys.stderr.flush()
+
+
 if prog == 'j2d':
     # Jacobi 2D Input
     phase2_global_loads = 5.0
@@ -38,6 +42,18 @@ elif prog == 'j1d':
     data_size = 4.0
     executable = '../../build.out/ocl-jacobi-1d'
     dim = 1
+elif prog == 'j3d':
+    # Jacobi 3D Input
+    phase2_global_loads = 7.0
+    phase2_shared_loads = 0.0
+    compute_per_point = 7.0
+    phase3_shared_loads = 7.0
+    phase4_global_stores = 1.0
+    shared_stores = 1.0
+    num_fields = 1.0
+    data_size = 4.0
+    executable = '../../build.out/ocl-jacobi-3d'
+    dim = 3
 elif prog == 'p2d':
     # Poisson 2D Input
     phase2_global_loads = 9.0
@@ -79,7 +95,7 @@ elif prog == 'fdtd2d':
     phase2_global_loads = 7.0
     phase2_shared_loads = 4.0
     compute_per_point = 11.0
-    phase3_shared_loads = 11.0  
+    phase3_shared_loads = 5.0  
     phase4_global_stores = 3.0
     shared_stores = 3.0
     num_fields = 3.0
@@ -91,7 +107,7 @@ elif prog == 'rician2d':
     phase2_global_loads = 9.0
     phase2_shared_loads = 0.0
     compute_per_point = 42.0
-    phase3_shared_loads = 9.0
+    phase3_shared_loads = 13.0
     phase4_global_stores = 1.0
     shared_stores = 1.0
     num_fields = 1.0
@@ -186,8 +202,11 @@ if dim == 1:
     block_size_y = [1]
     block_size_z = [1]
 elif dim == 2:
+    #block_size_x = range(32, 256+1, 32)
+    #block_size_y = range(1, 32+1, 1)
     block_size_x = [32, 64]
-    block_size_y = [4, 6]
+    #block_size_x = [256]
+    block_size_y = [4, 8]
     block_size_z = [1]
 else:
     block_size_x = [8, 16, 32]
@@ -195,7 +214,10 @@ else:
     block_size_z = [2, 4, 6]
 
 
-time_tile_size = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+#time_tile_size = range(1, 12+1, 1)
+#elems_per_thread = range(1, 12+1, 1)
+
+time_tile_size = [2, 4, 6, 8, 10]
 elems_per_thread = [2, 4, 6, 8]
 
 phases = [0]
@@ -232,13 +254,20 @@ avg_error = 0.0
 min_error = 100000.0
 max_error = -100000.0
 
+
+count = 1
+
 # Iterate configuration space
 for (x, y, z, t, e, phase_limit) in configs:
+
+    sys.stderr.write('Running %d of %d\n' % (count, len(configs)))
+    sys.stderr.flush()
+    count = count + 1
 
     if dim == 1:
         problem_size = 5000
     elif dim == 2:
-        problem_size = 2000
+        problem_size = 1800
     else:
         problem_size = 64
 
@@ -311,9 +340,30 @@ for (x, y, z, t, e, phase_limit) in configs:
 
     # Cache Model
     if arch == 'fermi' or arch == 'gcn':
-        p2_glb = 5.0*e
-        p2_glb = e+4.0
-        p2_shd = 5.0*e - p2_glb
+        if prog == 'j2d':
+            p2_glb = 5.0*e
+            p2_glb = e+4.0
+            p2_shd = 5.0*e - p2_glb
+        elif prog == 'fdtd2d':
+
+            e_min = elems_per_thread[0]
+            e_max = elems_per_thread[-1]
+
+            t1 = e_max - e_min
+            t2 = e_max - e
+            t3 = t2 / t1
+            t4 = t3 / 0.5
+            t5 = 1.0 - t4
+            
+
+            p2_glb = phase2_global_loads * e
+            p2_glb = 4.0 * e + 1.0
+            p2_glb = p2_glb * ((2.5 ** (1.0/8.0)) ** e)
+            p2_shd = phase2_global_loads * e - p2_glb
+
+        else:
+            sys.stderr.write('No cache model!\n')
+            exit(1)
     else:
         # No Cache
         p2_glb = phase2_global_loads * e
@@ -321,8 +371,11 @@ for (x, y, z, t, e, phase_limit) in configs:
 
     k_op = compute_per_point * e
 
+    #Bprime = 8.0*p2_glb + B_gmem
+    Bprime = B_gmem
+
     t_glb = max(c_load*(p2_glb+p2_shd)*active_warps + c_op*k_op*active_warps,
-                L_gmem + c_load + max(B_gmem*p2_glb*active_warps, B_smem*p2_shd*e*active_warps))
+                L_gmem + c_load + max(Bprime*p2_glb*active_warps, B_smem*p2_shd*e*active_warps))
 
     #t_glb = max(c_load*(p2_glb+p2_shd)*active_warps + c_op*k_op*active_warps,
     #            L_gmem + c_load + B_gmem*p2_glb*active_warps)

@@ -584,7 +584,7 @@ int main(int argc,
   // printValue("Max Work-Group Size", maxWorkGroupSize);
 
 
-  if(params.blockSizeX*params.blockSizeY > maxWorkGroupSize) {
+  if((size_t)params.blockSizeX*(size_t)params.blockSizeY > maxWorkGroupSize) {
     std::cout << "ERROR: Block dimensions are too large!\n";
     return 1;
   }

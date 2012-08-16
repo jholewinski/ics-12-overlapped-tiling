@@ -59,6 +59,7 @@ public:
     printValue("Shared Stores/Block", sharedStoresPerBlock);
     printValue("Real Per Block X", params.realPerBlockX);
     printValue("Real Per Block Y", params.realPerBlockY);
+    printValue("Padded Size", params.paddedSize);
   }
 
 };

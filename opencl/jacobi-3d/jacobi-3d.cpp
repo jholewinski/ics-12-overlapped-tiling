@@ -46,7 +46,8 @@ struct GeneratorParams {
   int32_t     numBlocksY;
   int32_t     numBlocksZ;
   std::string fpSuffix;
-  
+
+  int32_t phaseLimit;
   
 
   /**
@@ -67,7 +68,8 @@ struct GeneratorParams {
       dataType(type),
       blockSizeX(bsx),
       blockSizeY(bsy),
-      blockSizeZ(bsz) {
+      blockSizeZ(bsz),
+      phaseLimit(0) {
   }
 
   void computeDerived() {
@@ -235,10 +237,19 @@ void Jacobi3DGenerator::generateLocals(std::ostream& stream,
     stream << "  " << params.dataType << " local" << i << ";\n";
     stream << "  " << params.dataType << " new" << i << ";\n";
   }
+
+  if(params.phaseLimit == 1) {
+    stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
+  }
+
 }
 
 void Jacobi3DGenerator::generateCompute(std::ostream& stream,
                                         const GeneratorParams& params) {
+  if (params.phaseLimit == 3) {
+    // We only want phase 3, so completely skip phase 2
+    stream << "  if(get_local_id(0) == 100000) {\n";
+  }
 
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  {\n";
@@ -279,8 +290,16 @@ void Jacobi3DGenerator::generateCompute(std::ostream& stream,
 
   stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
 
+  if(params.phaseLimit == 2) {
+    stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
+  }
+
+  if (params.phaseLimit == 3) {
+    stream << "  }\n";
+  }
+
   stream << "  #pragma unroll\n";
-  stream << "  for(int32_t t = 1; t < " << params.timeTileSize << "; ++t) {\n";
+  stream << "  for(int t = 1; t < " << params.timeTileSize << "; ++t) {\n";
     stream << "  if (baseTime + t >= " << params.timeSteps << ") break;\n";
     for(int32_t i = 0; i < params.elementsPerThread; ++i) {
       stream << "  {\n";
@@ -336,6 +355,12 @@ void Jacobi3DGenerator::generateCompute(std::ostream& stream,
     }
     stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
     stream << "  }\n";
+
+    if(params.phaseLimit == 3) {
+    stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
+  }
+
+        
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  if(writeValid" << i << " && writeValidX) {\n";
     stream << "    *(outputPtr+(" << params.paddedSize << "*" << i
@@ -420,6 +445,9 @@ int main(int argc,
     ("time-tile-size,s",
      po::value<int32_t>(&params.timeTileSize)->default_value(1),
      "Set time tile size")
+    ("phase-limit,p",
+     po::value<int32_t>(&params.phaseLimit)->default_value(0),
+     "Stop after a certain kernel phase")
     ("load-kernel,f",
      po::value<std::string>(&kernelFile)->default_value(""),
      "Load kernel from disk")
