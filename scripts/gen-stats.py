@@ -368,7 +368,7 @@ for (x, y, z, t, e, phase_limit) in configs:
 
     min_real = min(min_real, real_elapsed)
 
-    error = (sim_elapsed - real_elapsed) / real_elapsed
+    error = abs((sim_elapsed - real_elapsed) / real_elapsed)
     avg_error = avg_error + error
 
     min_error = min(min_error, error)
@@ -386,8 +386,8 @@ for (x, y, z, t, e, phase_limit) in configs:
 
 
 # Find best results
-sorted_results = sorted(results, key=lambda x: x[7])
-sorted_results.reverse()
+sorted_results = sorted(results, key=lambda x: x[6])
+#sorted_results.reverse()
 
 
 for pt in sorted_results[:3]:

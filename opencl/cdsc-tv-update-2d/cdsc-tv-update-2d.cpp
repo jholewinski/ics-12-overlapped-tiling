@@ -471,6 +471,9 @@ int main(int argc,
     ("block-size-y,y",
      po::value<int32_t>(&params.blockSizeY)->default_value(16),
      "Set block size (Y)")
+    ("block-size-z,z",
+     po::value<int32_t>(&params.blockSizeZ)->default_value(1),
+     "Set block size (Z)")
     ("elements-per-thread,e",
      po::value<int32_t>(&params.elementsPerThread)->default_value(1),
      "Set elements per thread")
