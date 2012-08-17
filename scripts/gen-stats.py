@@ -214,11 +214,11 @@ else:
     block_size_z = [2, 4, 6]
 
 
-#time_tile_size = range(1, 12+1, 1)
-#elems_per_thread = range(1, 12+1, 1)
+time_tile_size = range(1, 12+1, 1)
+elems_per_thread = range(1, 12+1, 1)
 
-time_tile_size = [2, 4, 6, 8, 10]
-elems_per_thread = [2, 4, 6, 8]
+#time_tile_size = [2, 4, 6, 8, 10]
+#elems_per_thread = [2, 4, 6, 8]
 
 phases = [0]
 
@@ -345,7 +345,6 @@ for (x, y, z, t, e, phase_limit) in configs:
             p2_glb = e+4.0
             p2_shd = 5.0*e - p2_glb
         elif prog == 'fdtd2d':
-
             e_min = elems_per_thread[0]
             e_max = elems_per_thread[-1]
 
@@ -360,10 +359,20 @@ for (x, y, z, t, e, phase_limit) in configs:
             p2_glb = 4.0 * e + 1.0
             p2_glb = p2_glb * ((2.5 ** (1.0/8.0)) ** e)
             p2_shd = phase2_global_loads * e - p2_glb
-
+        elif prog == 'g2d':
+            p2_glb = e + 4.0
+            p2_shd = phase2_global_loads * e - p2_glb
+        elif prog == 'p2d':
+            p2_glb = 3*e + 6.0
+            p2_shd = phase2_global_loads * e - p2_glb
+        elif prog == 'rician2d':
+            p2_glb = e + 4.0
+            p2_shd = phase2_global_loads * e - p2_glb
         else:
             sys.stderr.write('No cache model!\n')
             exit(1)
+
+        p2_shd = p2_shd + phase2_shared_loads*e
     else:
         # No Cache
         p2_glb = phase2_global_loads * e
