@@ -204,8 +204,10 @@ if dim == 1:
 elif dim == 2:
     #block_size_x = range(32, 256+1, 32)
     #block_size_y = range(1, 32+1, 1)
-    block_size_x = [32, 64]
+    #block_size_x = [32, 64]
     #block_size_x = [256]
+    #block_size_y = [4, 8]
+    block_size_x = [32, 64]
     block_size_y = [4, 8]
     block_size_z = [1]
 else:
@@ -214,11 +216,11 @@ else:
     block_size_z = [2, 4, 6]
 
 
-time_tile_size = range(1, 12+1, 1)
-elems_per_thread = range(1, 12+1, 1)
+#time_tile_size = range(1, 12+1, 1)
+#elems_per_thread = range(1, 12+1, 1)
 
-#time_tile_size = [2, 4, 6, 8, 10]
-#elems_per_thread = [2, 4, 6, 8]
+time_tile_size = range(1, 6+1, 1)
+elems_per_thread = range(1, 12+1, 1)
 
 phases = [0]
 
@@ -343,7 +345,6 @@ for (x, y, z, t, e, phase_limit) in configs:
         if prog == 'j2d':
             p2_glb = 5.0*e
             p2_glb = e+4.0
-            p2_shd = 5.0*e - p2_glb
         elif prog == 'fdtd2d':
             e_min = elems_per_thread[0]
             e_max = elems_per_thread[-1]
@@ -357,22 +358,21 @@ for (x, y, z, t, e, phase_limit) in configs:
 
             p2_glb = phase2_global_loads * e
             p2_glb = 4.0 * e + 1.0
-            p2_glb = p2_glb * ((2.5 ** (1.0/8.0)) ** e)
-            p2_shd = phase2_global_loads * e - p2_glb
+
         elif prog == 'g2d':
             p2_glb = e + 4.0
-            p2_shd = phase2_global_loads * e - p2_glb
         elif prog == 'p2d':
             p2_glb = 3*e + 6.0
-            p2_shd = phase2_global_loads * e - p2_glb
         elif prog == 'rician2d':
             p2_glb = e + 4.0
-            p2_shd = phase2_global_loads * e - p2_glb
         else:
             sys.stderr.write('No cache model!\n')
             exit(1)
 
+        p2_glb = p2_glb * ((2.0 ** (1.0/8.0)) ** e)
+        p2_shd = phase2_global_loads*e - p2_glb
         p2_shd = p2_shd + phase2_shared_loads*e
+
     else:
         # No Cache
         p2_glb = phase2_global_loads * e
@@ -457,7 +457,7 @@ for (_, _, _, _, _, real, _, _) in results:
     overhead = real / min_real
     max_overhead = max(max_overhead, overhead)
 
-for pt in sorted_results[:3]:
+for pt in sorted_results[:5]:
     (x, y, z, t, e, real, sim, pts_per_clk) = pt
     rel_time = real / min_real
     sys.stderr.write('%s: %f\n' % (str(pt), rel_time))
