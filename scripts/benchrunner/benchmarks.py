@@ -17,6 +17,10 @@ def run_benchmark(path, prob_size, time_steps, time_tile_size, elems_per_thread,
     if 'phase' in kwargs:
         args = args + ' -p %d' % kwargs['phase']
 
+    sys.stderr.write(args)
+    sys.stderr.write('\n')
+    sys.stderr.flush()
+
     start = time.time()
     proc = subprocess.Popen(args.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (stdout, stderr) = proc.communicate()

@@ -479,7 +479,7 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
 
   stream << "  unsigned int clockP4;\n";
 
-  stream << "dump_stats:\n\n";
+  stream << "dump_stats: (void)0;\n\n";
   
   if (params.dumpClocks) {
     stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockP4));\n";

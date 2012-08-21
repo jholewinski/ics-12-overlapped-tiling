@@ -204,7 +204,7 @@ if dim == 1:
 elif dim == 2:
     #block_size_x = range(32, 256+1, 32)
     #block_size_y = range(1, 32+1, 1)
-    block_size_x = [32]
+    block_size_x = [64]
     #block_size_x = [256]
     block_size_y = [8]
     block_size_z = [1]
@@ -217,8 +217,8 @@ else:
 #time_tile_size = range(1, 12+1, 1)
 #elems_per_thread = range(1, 12+1, 1)
 
-time_tile_size = range(1, 6+1, 1)
-elems_per_thread = range(2, 12+1, 2)
+time_tile_size = [2]
+elems_per_thread = [1]
 
 phases = [0]
 
@@ -267,11 +267,11 @@ for (x, y, z, t, e, phase_limit) in configs:
     if dim == 1:
         problem_size = 5000
     elif dim == 2:
-        problem_size = 1800
+        problem_size = 400
     else:
         problem_size = 64
 
-    time_steps = 64
+    time_steps = 2
 
 
     """
