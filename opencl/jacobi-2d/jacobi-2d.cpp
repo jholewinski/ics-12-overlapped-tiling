@@ -50,6 +50,8 @@ struct GeneratorParams {
   bool timeOnlySMem;
   int32_t phaseLimit;
 
+  bool dumpClocks;
+  
   /**
    * Default constructor.
    */
@@ -73,7 +75,8 @@ struct GeneratorParams {
       timeOnlyGMem(false),
       timeOnlyInstr(false),
       timeOnlySMem(false),
-      phaseLimit(0) {
+      phaseLimit(0),
+      dumpClocks(false) {
   }
 
   void computeDerived() {
@@ -168,10 +171,18 @@ std::string Jacobi2DGenerator::generate(GeneratorParams& params) {
 void Jacobi2DGenerator::generateHeader(std::ostream& stream,
                                        const GeneratorParams& params) {
   stream << "/* Auto-generated.  Do not edit by hand. */\n";
+  if (params.dumpClocks) {
+    stream << "struct ClockData {\n";
+    stream << "  unsigned int SMId;\n";
+    stream << "  unsigned Clock[5];\n";
+    stream << "};\n";
+  }
   stream << "__kernel\n";
   stream << "void kernel_func(__global " << params.dataType << "* input,\n";
   stream << "                 __global " << params.dataType << "* output,\n";
-  stream << "                 __global unsigned int* clockData,\n";
+  if (params.dumpClocks) {
+    stream << "                 __global struct ClockData* clockData,\n";
+  }
   stream << "                 unsigned baseTime) {\n";
 }
 
@@ -184,8 +195,10 @@ void Jacobi2DGenerator::generateLocals(std::ostream& stream,
   stream << "  __local " << params.dataType << " buffer[" << params.sharedSizeY
          << "][" << params.sharedSizeX << "];\n";
 
-  //stream << "  unsigned int clockStart, clockStop;\n";
-  //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStart));\n";
+  if (params.dumpClocks) {
+    stream << "  unsigned int clockP0;\n";
+    stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockP0));\n";
+  }
 
   // Compute some pointer values
   stream << "  __global " << params.dataType
@@ -252,6 +265,10 @@ void Jacobi2DGenerator::generateLocals(std::ostream& stream,
     stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
   }
 
+  if (params.dumpClocks) {
+    stream << "  unsigned int clockP1;\n";
+    stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockP1));\n";
+  }
 
   //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStop));\n";
   //stream << "  if(get_global_id(0) == 0) {\n";
@@ -330,6 +347,11 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
 
   if (params.phaseLimit == 3) {
     stream << "  }\n";
+  }
+
+  if (params.dumpClocks) {
+    stream << "  unsigned int clockP2;\n";
+    stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockP2));\n";
   }
 
   //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStop));\n";
@@ -424,8 +446,13 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
 
   //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStart));\n";
 
+  if (params.dumpClocks) {
+    stream << "  unsigned int clockP3;\n";
+    stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockP3));\n";
+  }
+  
   if(params.phaseLimit == 3) {
-    stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
+    stream << "  if(get_local_id(0) != (unsigned)(-1)) { goto dump_stats; }\n";
   }
   
   if(params.timeOnlyInstr || params.timeOnlySMem) {
@@ -450,6 +477,32 @@ void Jacobi2DGenerator::generateCompute(std::ostream& stream,
     stream << "}\n";
   }
 
+  stream << "  unsigned int clockP4;\n";
+
+  stream << "dump_stats:\n\n";
+  
+  if (params.dumpClocks) {
+    stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockP4));\n";
+
+    stream << "  unsigned int sm;\n";
+    stream << "  asm(\"mov.u32 %0, %%smid;\" : \"=r\"(sm));\n";
+
+    stream << "  if (sm == 1) {\n";
+    stream << "    struct ClockData CD;\n";
+    stream << "    CD.SMId = sm;\n";
+    stream << "    CD.Clock[0] = clockP0;\n";
+    stream << "    CD.Clock[1] = clockP1;\n";
+    stream << "    CD.Clock[2] = clockP2;\n";
+    stream << "    CD.Clock[3] = clockP3;\n";
+    stream << "    CD.Clock[4] = clockP4;\n";
+
+    stream << "    unsigned BlockId = get_group_id(1)*get_num_groups(0) + get_group_id(0);\n";
+    stream << "    unsigned ThreadsPerBlock = get_local_size(0) * get_local_size(1);\n";
+    stream << "    unsigned ThreadId = get_local_id(1)*get_local_size(0) + get_local_id(0);\n";
+    stream << "    unsigned GlobalId = BlockId*ThreadsPerBlock + ThreadId;\n";
+    stream << "    clockData[GlobalId] = CD;\n";
+    stream << "  }\n";
+  }
   //stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockStop));\n";
   //stream << "  if(get_global_id(0) == 0) {\n";
   //stream << "    clockData[3] = (clockStop - clockStart);\n";
@@ -512,6 +565,9 @@ int main(int argc,
     ("problem-size,n",
      po::value<int32_t>(&params.problemSize)->default_value(1024),
      "Set problem size")
+    ("dump-clocks,c",
+     po::value<bool>(&params.dumpClocks)->default_value(false),
+     "Dump clock values")
     ("time-steps,t",
      po::value<int32_t>(&params.timeSteps)->default_value(64),
      "Set number of time steps")
@@ -560,11 +616,11 @@ int main(int argc,
   }
 
   if(timeOnly == "gmem") {
-    params.timeOnlyGMem = true;
+    params.timeOnlyGMem     = true;
   } else if(timeOnly == "instr") {
-    params.timeOnlyInstr = true;
+    params.timeOnlyInstr    = true;
   } else if(timeOnly == "smem") {
-    params.timeOnlySMem = true;
+    params.timeOnlySMem     = true;
   } else {
     assert(timeOnly.size() == 0);
   }
@@ -572,11 +628,11 @@ int main(int argc,
   std::string kernelSource;
 
   if(kernelFile.size() == 0) {
-    kernelSource = gen.generate(params);
+    kernelSource        = gen.generate(params);
   } else {
     std::ifstream kernelStream(kernelFile.c_str());
-    kernelSource = std::string(std::istreambuf_iterator<char>(kernelStream),
-                               (std::istreambuf_iterator<char>()));
+    kernelSource        = std::string(std::istreambuf_iterator<char>(kernelStream),
+                                      (std::istreambuf_iterator<char>()));
     kernelStream.close();
     params.computeDerived();
   }
@@ -690,7 +746,7 @@ int main(int argc,
   std::vector<cl::Device> devices;
   devices.push_back(context.device());
 
-  result = program.build(devices, "");
+  result = program.build(devices, "-cl-nv-verbose");
   if(result != CL_SUCCESS) {
     std::cout << "Source compilation failed.\n";
 #ifndef SIM_BUILD
@@ -701,13 +757,13 @@ int main(int argc,
 
   // Extract out the register usage
 #ifndef SIM_BUILD
-  std::string log =
+  std::string log = 
     program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(context.device());
-  boost::regex regExpr("Used ([0-9]+) registers");
-  boost::smatch match;
+  boost::regex                regExpr("Used ([0-9]+) registers");
+  boost::smatch               match;
   std::string::const_iterator start, end;
-  start = log.begin();
-  end = log.end();
+  start           = log.begin();
+  end             = log.end();
   if(boost::regex_search(start, end, match, regExpr,
                          boost::match_default)) {
     printValue("Register Usage", match[1]);
@@ -761,10 +817,10 @@ int main(int argc,
       for(int i = params.padding; i < params.paddedSize-params.padding; ++i) {
         for(int j = params.padding; j < params.paddedSize-params.padding; ++j) {
           refB[i*params.paddedSize + j] = (1.0f / 5.0f) * (refA[i*params.paddedSize + (j-1)]
-                                                    + refA[i*params.paddedSize + (j)]
-                                                    + refA[i*params.paddedSize + (j+1)]
-                                                    + refA[(i-1)*params.paddedSize + (j)]
-                                                    + refA[(i+1)*params.paddedSize + (j)]);
+                                                           + refA[i*params.paddedSize + (j)]
+                                                           + refA[i*params.paddedSize + (j+1)]
+                                                           + refA[(i-1)*params.paddedSize + (j)]
+                                                           + refA[(i+1)*params.paddedSize + (j)]);
         }
       }
 
@@ -788,9 +844,31 @@ int main(int argc,
                           arraySize, NULL, &result);
   CLContext::throwOnError("Failed to allocate device output", result);
 
-  cl::Buffer deviceClock(context.context(), CL_MEM_WRITE_ONLY,
-                         sizeof(unsigned int)*128, NULL, &result);
-  CLContext::throwOnError("Failed to allocate device output", result);
+  cl::Buffer *deviceClock;
+
+  struct ClockData {
+    unsigned int SMId;
+    unsigned int Clock[5];
+  };
+  
+  unsigned ClockDataSize = sizeof(ClockData)*params.numBlocksX*params.numBlocksY*params.blockSizeX*params.blockSizeY;
+  
+  if (params.dumpClocks) {
+    ClockData *hostClock = new ClockData[params.blockSizeX*params.blockSizeY*params.numBlocksX*params.numBlocksY];
+
+    memset(hostClock, 0, ClockDataSize);
+    
+    deviceClock = new cl::Buffer(context.context(), CL_MEM_WRITE_ONLY,
+                                 ClockDataSize, NULL, &result);
+    CLContext::throwOnError("Failed to allocate device output", result);
+
+    result = queue.enqueueWriteBuffer(*deviceClock, CL_TRUE, 0,
+                                      ClockDataSize, hostClock,
+                                      NULL, NULL);
+    CLContext::throwOnError("Failed to copy input data to device", result);
+
+    delete hostClock;
+  }
 
   // Copy host data to device
   result = queue.enqueueWriteBuffer(deviceInput, CL_TRUE, 0,
@@ -820,14 +898,19 @@ int main(int argc,
   for(int t = 0; t < params.timeSteps; t += params.timeTileSize) {
 
     // Set kernel arguments
-    result = kernel.setArg(0, *inputBuffer);
+    result   = kernel.setArg(0, *inputBuffer);
     CLContext::throwOnError("Failed to set input parameter", result);
-    result = kernel.setArg(1, *outputBuffer);
+    result   = kernel.setArg(1, *outputBuffer);
     CLContext::throwOnError("Failed to set output parameter", result);
-    result = kernel.setArg(2, deviceClock);
-    CLContext::throwOnError("Failed to set output parameter", result);
-    result = kernel.setArg(3, t);
-    CLContext::throwOnError("Failed to set output parameter", result);
+    if (params.dumpClocks) {
+      result = kernel.setArg(2, *deviceClock);
+      CLContext::throwOnError("Failed to set output parameter", result);
+      result = kernel.setArg(3, t);
+      CLContext::throwOnError("Failed to set output parameter", result);
+    } else {
+      result = kernel.setArg(2, t);
+      CLContext::throwOnError("Failed to set output parameter", result);
+    }
 
     // Invoke the kernel
     result = queue.enqueueNDRangeKernel(kernel, cl::NullRange,
@@ -843,7 +926,7 @@ int main(int argc,
   double endTime = rtclock();
   double elapsed = endTime - startTime;
 
-  unsigned int hostClock[128];
+
 
   // Copy results back to host
   result = queue.enqueueReadBuffer(*inputBuffer, CL_TRUE, 0,
@@ -851,10 +934,47 @@ int main(int argc,
                                    NULL, NULL);
   CLContext::throwOnError("Failed to copy result to host", result);
 
-  result = queue.enqueueReadBuffer(deviceClock, CL_TRUE, 0,
-                                   sizeof(unsigned int)*128, hostClock,
-                                   NULL, NULL);
-  CLContext::throwOnError("Failed to copy result to host", result);
+  if (params.dumpClocks) {
+    ClockData *hostClock = new ClockData[params.blockSizeX*params.blockSizeY*params.numBlocksX*params.numBlocksY];
+      
+    result = queue.enqueueReadBuffer(*deviceClock, CL_TRUE, 0,
+                                     ClockDataSize, hostClock,
+                                     NULL, NULL);
+    CLContext::throwOnError("Failed to copy result to host", result);
+
+    unsigned NumThreads = params.blockSizeX*params.blockSizeY*params.numBlocksX*params.numBlocksY;
+
+    std::cerr << "bx,by,warp,sm,clock0,clock1,clock2,clock3,clock4,\n";
+
+    for (unsigned by = 0; by < params.numBlocksY; ++by) {
+      for (unsigned bx = 0; bx < params.numBlocksX; ++bx) {
+        for (unsigned w = 0; w < (params.blockSizeX*params.blockSizeY/32); ++w) {
+          unsigned BlockId         = by*params.numBlocksX + bx;
+          unsigned ThreadsPerBlock = params.blockSizeX*params.blockSizeY;
+          unsigned ThreadId        = w * 32;
+          unsigned GlobalId        = BlockId*ThreadsPerBlock + ThreadId;
+          if (hostClock[GlobalId].SMId == 1) {
+            std::cerr << bx
+                      << "," << by
+                      << "," << w
+                      << "," << hostClock[GlobalId].SMId
+                      << "," << hostClock[GlobalId].Clock[0]
+                      << "," << hostClock[GlobalId].Clock[1]
+                      << "," << hostClock[GlobalId].Clock[2]
+                      << "," << hostClock[GlobalId].Clock[3]
+                      << "," << hostClock[GlobalId].Clock[4]
+                      << ",\n";
+          }
+        }
+      }
+    }
+
+    for (unsigned i = 0; i < NumThreads; i += 32) {
+      
+    }
+    
+    delete hostClock;
+  }
 
   printValue("Elapsed Time", elapsed);
 
@@ -882,6 +1002,10 @@ int main(int argc,
   //printValue("Clock (Write)", hostClock[3]);
   //printValue("Clock (Total)", (hostClock[0] + hostClock[1] + hostClock[2] + hostClock[3]));
 
+  if (params.dumpClocks) {
+    delete deviceClock;
+  }
+  
   // Clean-up
   delete [] hostData;
 

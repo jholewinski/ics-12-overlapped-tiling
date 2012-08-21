@@ -204,11 +204,9 @@ if dim == 1:
 elif dim == 2:
     #block_size_x = range(32, 256+1, 32)
     #block_size_y = range(1, 32+1, 1)
-    #block_size_x = [32, 64]
+    block_size_x = [32]
     #block_size_x = [256]
-    #block_size_y = [4, 8]
-    block_size_x = [32, 64]
-    block_size_y = [4, 8]
+    block_size_y = [8]
     block_size_z = [1]
 else:
     block_size_x = [8, 16, 32]
@@ -220,7 +218,7 @@ else:
 #elems_per_thread = range(1, 12+1, 1)
 
 time_tile_size = range(1, 6+1, 1)
-elems_per_thread = range(1, 12+1, 1)
+elems_per_thread = range(2, 12+1, 2)
 
 phases = [0]
 
@@ -365,11 +363,17 @@ for (x, y, z, t, e, phase_limit) in configs:
             p2_glb = 3*e + 6.0
         elif prog == 'rician2d':
             p2_glb = e + 4.0
+        elif prog == 'j3d':
+            p2_glb = 3.0*e + 4.0
+        elif prog == 'tv2d':
+            p2_glb = 2.0*e + 5.0
+        elif prog == 'j1d':
+            p2_glb = phase2_global_loads * e
         else:
             sys.stderr.write('No cache model!\n')
             exit(1)
 
-        p2_glb = p2_glb * ((2.0 ** (1.0/8.0)) ** e)
+        #p2_glb = p2_glb * ((2.0 ** (1.0/8.0)) ** e)
         p2_shd = phase2_global_loads*e - p2_glb
         p2_shd = p2_shd + phase2_shared_loads*e
 
@@ -384,7 +388,7 @@ for (x, y, z, t, e, phase_limit) in configs:
     Bprime = B_gmem
 
     t_glb = max(c_load*(p2_glb+p2_shd)*active_warps + c_op*k_op*active_warps,
-                L_gmem + c_load + max(Bprime*p2_glb*active_warps, B_smem*p2_shd*e*active_warps))
+                L_gmem + c_load + max(Bprime*p2_glb*active_warps, B_smem*p2_shd*active_warps))
 
     #t_glb = max(c_load*(p2_glb+p2_shd)*active_warps + c_op*k_op*active_warps,
     #            L_gmem + c_load + B_gmem*p2_glb*active_warps)

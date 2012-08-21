@@ -48,7 +48,8 @@ struct GeneratorParams {
   std::string fpSuffix;
 
   int32_t phaseLimit;
-  
+
+  bool dumpClocks;
 
   /**
    * Default constructor.
@@ -69,7 +70,8 @@ struct GeneratorParams {
       blockSizeX(bsx),
       blockSizeY(bsy),
       blockSizeZ(bsz),
-      phaseLimit(0) {
+      phaseLimit(0),
+      dumpClocks(false) {
   }
 
   void computeDerived() {
@@ -160,9 +162,20 @@ std::string Jacobi3DGenerator::generate(GeneratorParams& params) {
 void Jacobi3DGenerator::generateHeader(std::ostream& stream,
                                        const GeneratorParams& params) {
   stream << "/* Auto-generated.  Do not edit by hand. */\n";
+  if (params.dumpClocks) {
+    stream << "struct ClockData {\n";
+    stream << "  unsigned int SMId;\n";
+    stream << "  unsigned Clock[5];\n";
+    stream << "};\n";
+  }
+
   stream << "__kernel\n";
   stream << "void kernel_func(__global " << params.dataType << "* input,\n";
   stream << "                 __global " << params.dataType << "* output,\n";
+  if (params.dumpClocks) {
+    stream << "                 __global struct ClockData* clockData,\n";
+  }
+
   stream << "                 unsigned baseTime) {\n";
 }
 
@@ -174,6 +187,11 @@ void Jacobi3DGenerator::generateLocals(std::ostream& stream,
                                        const GeneratorParams& params) {
   stream << "  __local " << params.dataType << " buffer[" << params.sharedSizeZ
          << "][" << params.sharedSizeY << "][" << params.sharedSizeZ << "];\n";
+
+  if (params.dumpClocks) {
+    stream << "  unsigned int clockP0;\n";
+    stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockP0));\n";
+  }
 
   // Compute some pointer values
   stream << "  __global " << params.dataType
@@ -242,6 +260,11 @@ void Jacobi3DGenerator::generateLocals(std::ostream& stream,
     stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
   }
 
+  if (params.dumpClocks) {
+    stream << "  unsigned int clockP1;\n";
+    stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockP1));\n";
+  }
+
 }
 
 void Jacobi3DGenerator::generateCompute(std::ostream& stream,
@@ -289,6 +312,12 @@ void Jacobi3DGenerator::generateCompute(std::ostream& stream,
   }
 
   stream << "  barrier(CLK_LOCAL_MEM_FENCE);\n";
+
+  if (params.dumpClocks) {
+    stream << "  unsigned int clockP2;\n";
+    stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockP2));\n";
+  }
+
 
   if(params.phaseLimit == 2) {
     stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
@@ -360,6 +389,12 @@ void Jacobi3DGenerator::generateCompute(std::ostream& stream,
     stream << "  if(get_local_id(0) != (unsigned)(-1)) { return; }\n";
   }
 
+  if (params.dumpClocks) {
+    stream << "  unsigned int clockP3;\n";
+    stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockP3));\n";
+  }
+  
+
         
   for(int32_t i = 0; i < params.elementsPerThread; ++i) {
     stream << "  if(writeValid" << i << " && writeValidX) {\n";
@@ -367,6 +402,32 @@ void Jacobi3DGenerator::generateCompute(std::ostream& stream,
            << ")) = local" << i << ";\n";
     stream << "  }\n";
   }
+
+
+  if (params.dumpClocks) {
+    stream << "  unsigned int clockP4;\n";
+    stream << "  asm(\"mov.u32 %0, %%clock;\" : \"=r\"(clockP4));\n";
+
+    stream << "  unsigned int sm;\n";
+    stream << "  asm(\"mov.u32 %0, %%smid;\" : \"=r\"(sm));\n";
+
+    stream << "  if (sm == 1) {\n";
+    stream << "    struct ClockData CD;\n";
+    stream << "    CD.SMId = sm;\n";
+    stream << "    CD.Clock[0] = clockP0;\n";
+    stream << "    CD.Clock[1] = clockP1;\n";
+    stream << "    CD.Clock[2] = clockP2;\n";
+    stream << "    CD.Clock[3] = clockP3;\n";
+    stream << "    CD.Clock[4] = clockP4;\n";
+
+    stream << "    unsigned BlockId = get_group_id(2)*get_num_groups(1)*get_num_groups(0) + get_group_id(1)*get_num_groups(0) + get_group_id(0);\n";
+    stream << "    unsigned ThreadsPerBlock = get_local_size(0) * get_local_size(1) * get_local_size(2);\n";
+    stream << "    unsigned ThreadId = get_local_id(2)*get_local_size(1)*get_local_size(0) + get_local_id(1)*get_local_size(0) + get_local_id(0);\n";
+    stream << "    unsigned GlobalId = BlockId*ThreadsPerBlock + ThreadId;\n";
+    stream << "    clockData[GlobalId] = CD;\n";
+    stream << "  }\n";
+  }
+
 }
 
 
@@ -424,6 +485,9 @@ int main(int argc,
   po::options_description desc("Options");
   desc.add_options()
     ("help,h", "Show usage information")
+    ("dump-clocks,c",
+     po::value<bool>(&params.dumpClocks)->default_value(false),
+     "Dump clock values")
     ("problem-size,n",
      po::value<int32_t>(&params.problemSize)->default_value(128),
      "Set problem size")
@@ -469,11 +533,11 @@ int main(int argc,
   std::string kernelSource;
   
   if(kernelFile.size() == 0) {
-    kernelSource = gen.generate(params);
+    kernelSource        = gen.generate(params);
   } else {
     std::ifstream kernelStream(kernelFile.c_str());
-    kernelSource = std::string(std::istreambuf_iterator<char>(kernelStream),
-                               (std::istreambuf_iterator<char>()));
+    kernelSource        = std::string(std::istreambuf_iterator<char>(kernelStream),
+                                      (std::istreambuf_iterator<char>()));
     kernelStream.close();
     params.computeDerived();
   }
@@ -639,7 +703,7 @@ int main(int argc,
     memcpy(refA, hostData, arraySize);
     memcpy(refB, hostData, arraySize);
 
-#define ARRAY_REF(A, i, j, k)                   \
+#define ARRAY_REF(A, i, j, k)                                         \
     (A[i*params.paddedSize*params.paddedSize+j*params.paddedSize+k])
 
     for(int t = 0; t < params.timeSteps; ++t) {
@@ -688,6 +752,34 @@ int main(int argc,
                                     NULL, NULL);
   CLContext::throwOnError("Failed to copy input data to device", result);
 
+
+  cl::Buffer *deviceClock;
+
+  struct ClockData {
+    unsigned int SMId;
+    unsigned int Clock[5];
+  };
+  
+  unsigned ClockDataSize = sizeof(ClockData)*params.numBlocksX*params.numBlocksY*params.numBlocksZ*params.blockSizeX*params.blockSizeY*params.blockSizeZ;
+  
+  if (params.dumpClocks) {
+    ClockData *hostClock = new ClockData[params.blockSizeX*params.blockSizeY*params.blockSizeZ*params.numBlocksX*params.numBlocksY*params.numBlocksZ];
+
+    memset(hostClock, 0, ClockDataSize);
+    
+    deviceClock = new cl::Buffer(context.context(), CL_MEM_READ_WRITE,
+                                 ClockDataSize, NULL, &result);
+    CLContext::throwOnError("Failed to allocate device output", result);
+
+    result = queue.enqueueWriteBuffer(*deviceClock, CL_TRUE, 0,
+                                      ClockDataSize, hostClock,
+                                      NULL, NULL);
+    CLContext::throwOnError("Failed to copy input data to device", result);
+
+    delete hostClock;
+  }
+
+
   cl::NDRange globalSize(params.blockSizeX*params.numBlocksX,
                          params.blockSizeY*params.numBlocksY,
                          params.blockSizeZ*params.numBlocksZ);
@@ -708,12 +800,19 @@ int main(int argc,
   for(int t = 0; t < params.timeSteps; t += params.timeTileSize) {
 
     // Set kernel arguments
-    result = kernel.setArg(0, *inputBuffer);
+    result   = kernel.setArg(0, *inputBuffer);
     CLContext::throwOnError("Failed to set input parameter", result);
-    result = kernel.setArg(1, *outputBuffer);
+    result   = kernel.setArg(1, *outputBuffer);
     CLContext::throwOnError("Failed to set output parameter", result);
-    result = kernel.setArg(2, t);
-    CLContext::throwOnError("Failed to set output parameter", result);
+    if (params.dumpClocks) {
+      result = kernel.setArg(2, *deviceClock);
+      CLContext::throwOnError("Failed to set output parameter", result);
+      result = kernel.setArg(3, t);
+      CLContext::throwOnError("Failed to set output parameter", result);
+    } else {
+      result = kernel.setArg(2, t);
+      CLContext::throwOnError("Failed to set output parameter", result);
+    }
   
     // Invoke the kernel
     result = queue.enqueueNDRangeKernel(kernel, cl::NullRange,
@@ -734,6 +833,46 @@ int main(int argc,
                                    arraySize, hostData,
                                    NULL, NULL);
   CLContext::throwOnError("Failed to copy result to host", result);
+
+  if (params.dumpClocks) {
+    ClockData *hostClock = new ClockData[params.blockSizeX*params.blockSizeY*params.blockSizeZ*params.numBlocksX*params.numBlocksY*params.numBlocksZ];
+      
+    result = queue.enqueueReadBuffer(*deviceClock, CL_TRUE, 0,
+                                     ClockDataSize, hostClock,
+                                     NULL, NULL);
+    CLContext::throwOnError("Failed to copy result to host", result);
+
+    std::cerr << "bx,by,bz,warp,sm,clock0,clock1,clock2,clock3,clock4,\n";
+
+    for (unsigned bz = 0; bz < params.numBlocksZ; ++bz) {
+      for (unsigned by = 0; by < params.numBlocksY; ++by) {
+        for (unsigned bx = 0; bx < params.numBlocksX; ++bx) {
+          for (unsigned w = 0; w < (params.blockSizeX*params.blockSizeY*params.blockSizeZ/32); ++w) {
+            unsigned BlockId         = bz*params.numBlocksY*params.numBlocksX + by*params.numBlocksX + bx;
+            unsigned ThreadsPerBlock = params.blockSizeX*params.blockSizeY*params.blockSizeZ;
+            unsigned ThreadId        = w * 32;
+            unsigned GlobalId        = BlockId*ThreadsPerBlock + ThreadId;
+            if (hostClock[GlobalId].SMId == 1) {
+              std::cerr << bx
+                        << "," << by
+                        << "," << bz
+                        << "," << w
+                        << "," << hostClock[GlobalId].SMId
+                        << "," << hostClock[GlobalId].Clock[0]
+                        << "," << hostClock[GlobalId].Clock[1]
+                        << "," << hostClock[GlobalId].Clock[2]
+                        << "," << hostClock[GlobalId].Clock[3]
+                        << "," << hostClock[GlobalId].Clock[4]
+                        << ",\n";
+            }
+          }
+        }
+      }
+    }
+
+    delete hostClock;
+  }
+
 
   printValue("Elapsed Time", elapsed);
 
@@ -756,6 +895,10 @@ int main(int argc,
     compareResults(reference, hostData, params);
   }
 
+  if (params.dumpClocks) {
+    delete deviceClock;
+  }
+  
 
 
   // Clean-up
