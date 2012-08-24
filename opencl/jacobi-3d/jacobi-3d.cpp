@@ -9,6 +9,7 @@
 
 #include <boost/math/common_factor.hpp>
 #include <boost/program_options.hpp>
+#include <boost/regex.hpp>
 
 using namespace ot;
 
@@ -639,7 +640,7 @@ int main(int argc,
   
 
   // Create a command queue.
-  cl::CommandQueue queue(context.context(), context.device(), 0, &result);
+  cl::CommandQueue queue(context.context(), context.device(), CL_QUEUE_PROFILING_ENABLE, &result);
   CLContext::throwOnError("cl::CommandQueue", result);
   
   // Build a program from the source
@@ -651,12 +652,29 @@ int main(int argc,
   std::vector<cl::Device> devices;
   devices.push_back(context.device());
   
-  result = program.build(devices);
+  result = program.build(devices, "-cl-nv-verbose");
   if(result != CL_SUCCESS) {
     std::cout << "Source compilation failed.\n";
     std::cout << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(context.device());
     return 1;
   }
+
+    // Extract out the register usage
+#ifndef SIM_BUILD
+  std::string log = 
+    program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(context.device());
+  boost::regex                regExpr("Used ([0-9]+) registers");
+  boost::smatch               match;
+  std::string::const_iterator start, end;
+  start           = log.begin();
+  end             = log.end();
+  if(boost::regex_search(start, end, match, regExpr,
+                         boost::match_default)) {
+    printValue("Register Usage", match[1]);
+  } else {
+    printValue("Register Usage", 0);
+  }
+#endif
 
   // Extract the kernel
   cl::Kernel kernel(program, "kernel_func", &result);
@@ -667,6 +685,7 @@ int main(int argc,
   float* hostData = new float[arraySize];
 
   // Fill host arrays
+#if 0
   for(int i = 0; i < params.paddedSize; ++i) {
     for(int j = 0; j < params.paddedSize; ++j) {
       for(int k = 0; k < params.paddedSize; ++k) {
@@ -684,7 +703,8 @@ int main(int argc,
       }
     }
   }
-
+#endif
+  
 
   // Compute reference
 
@@ -795,6 +815,8 @@ int main(int argc,
 
   cl::Event waitEvent;
 
+  std::vector<cl::Event> AllEvents;
+  
   double startTime = rtclock();
 
   for(int t = 0; t < params.timeSteps; t += params.timeTileSize) {
@@ -820,6 +842,8 @@ int main(int argc,
                                         0, &waitEvent);
     CLContext::throwOnError("Kernel launch failed", result);
 
+    AllEvents.push_back(waitEvent);
+    
     std::swap(inputBuffer, outputBuffer);
   }
 
@@ -827,6 +851,18 @@ int main(int argc,
 
   double endTime = rtclock();
   double elapsed = endTime - startTime;
+
+  cl_ulong EventStart;
+  cl_ulong EventEnd;
+  
+  CLContext::throwOnError("Profile error", AllEvents[0].getProfilingInfo(CL_PROFILING_COMMAND_START, &EventStart));
+  CLContext::throwOnError("Profile error", AllEvents[AllEvents.size()-1].getProfilingInfo(CL_PROFILING_COMMAND_END, &EventEnd));
+
+  size_t ProfileTimerResolution = context.device()
+    .getInfo<CL_DEVICE_PROFILING_TIMER_RESOLUTION>();
+
+  printValue("EventElapsed", (EventEnd-EventStart)*1e-9);
+  printValue("ProfileTimerResolution", ProfileTimerResolution);
 
   // Copy results back to host
   result = queue.enqueueReadBuffer(*inputBuffer, CL_TRUE, 0,
@@ -889,7 +925,19 @@ int main(int argc,
     * (double)params.elementsPerThread * 7.0 * (double)params.timeSteps
     / elapsed / 1e9;
 
+  printValue("phase2_global_loads", 7.0);
+  printValue("phase2_shared_loads", 0.0);
+  printValue("compute_per_point", 7.0);
+  printValue("phase3_shared_loads", 5.0);
+  printValue("phase4_global_stores", 1.0);
+  printValue("shared_stores", 1.0);
+  printValue("num_fields", 1.0);
+  printValue("data_size", 4.0);
+
+  printValue("phase_limit", params.phaseLimit);
+  
   printValue("Device GFlop/s", gflops);
+  printValue("Dimensions", 3);
   
   if(vm.count("verify")) {
     compareResults(reference, hostData, params);

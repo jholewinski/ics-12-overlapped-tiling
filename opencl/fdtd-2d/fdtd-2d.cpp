@@ -42,6 +42,7 @@ struct GeneratorParams {
   int32_t     sharedSizeY;
   int32_t     numBlocksX;
   int32_t     numBlocksY;
+  int32_t     numBlocksZ;
   std::string fpSuffix;
 
   int32_t phaseLimit;
@@ -95,6 +96,8 @@ struct GeneratorParams {
        sharedSizeY < 1 || paddedSize < 1) {
       throw std::runtime_error("Consistency error!");
     }
+
+    numBlocksZ = 1;
   }
 };
 

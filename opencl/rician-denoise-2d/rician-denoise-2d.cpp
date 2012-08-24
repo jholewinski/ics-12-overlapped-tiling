@@ -46,6 +46,8 @@ struct GeneratorParams {
 
   int32_t phaseLimit;
 
+  int32_t numBlocksZ;
+  
 
   /**
    * Default constructor.
@@ -95,6 +97,8 @@ struct GeneratorParams {
        sharedSizeY < 1 || paddedSize < 1) {
       throw std::runtime_error("Consistency error!");
     }
+
+    numBlocksZ = 1;
   }
 };
 
@@ -643,7 +647,7 @@ int main(int argc,
   ProgramGenerator::printProgramParameters(params, 3, 6, 3, 44);
 
   // Create a command queue.
-  cl::CommandQueue queue(context.context(), context.device(), 0, &result);
+  cl::CommandQueue queue(context.context(), context.device(), CL_QUEUE_PROFILING_ENABLE, &result);
   CLContext::throwOnError("cl::CommandQueue", result);
 
   // Build a program from the source
@@ -687,12 +691,13 @@ int main(int argc,
   float* hostF    = new float[arraySize];
 
   // Fill host arrays
+#if 0
   for(int i = 0; i < params.paddedSize; ++i) {
     for(int j = 0; j < params.paddedSize; ++j) {
       if(i < params.padding || i >= (params.paddedSize-params.padding) ||
          j < params.padding || j         >= (params.paddedSize-params.padding)) {
         hostData[i*params.paddedSize +j]  = 0.0f;
-        hostF[i*params.paddedSize +j]  = 0.0f;
+        hostF[i*params.paddedSize +j]     = 0.0f;
       }
       else {
         hostData[i*params.paddedSize + j] = (float)rand() / ((float)RAND_MAX + 1.0f);
@@ -700,7 +705,7 @@ int main(int argc,
       }
     }
   }
-
+#endif
 
 
   // Compute reference
@@ -782,6 +787,8 @@ int main(int argc,
 
   cl::Event waitEvent;
 
+  std::vector<cl::Event> AllEvents;
+  
   double startTime = rtclock();
 
   for(int t = 0; t < params.timeSteps; t += params.timeTileSize) {
@@ -802,6 +809,8 @@ int main(int argc,
                                         0, &waitEvent);
     CLContext::throwOnError("Kernel launch failed", result);
 
+    AllEvents.push_back(waitEvent);
+    
     std::swap(inputBuffer, outputBuffer);
   }
 
@@ -818,6 +827,19 @@ int main(int argc,
 
   printValue("Elapsed Time", elapsed);
 
+  cl_ulong EventStart;
+  cl_ulong EventEnd;
+  
+  CLContext::throwOnError("Profile error", AllEvents[0].getProfilingInfo(CL_PROFILING_COMMAND_START, &EventStart));
+  CLContext::throwOnError("Profile error", AllEvents[AllEvents.size()-1].getProfilingInfo(CL_PROFILING_COMMAND_END, &EventEnd));
+
+  size_t ProfileTimerResolution = context.device()
+    .getInfo<CL_DEVICE_PROFILING_TIMER_RESOLUTION>();
+
+  printValue("EventElapsed", (EventEnd-EventStart)*1e-9);
+  printValue("ProfileTimerResolution", ProfileTimerResolution);
+
+  
   // Could be 47 depending on how you count
   double compsPerPt = 42.0;
 
@@ -836,6 +858,16 @@ int main(int argc,
   if(vm.count("verify")) {
     compareResults(reference, hostData, params);
   }
+
+  printValue("phase2_global_loads", 13.0);
+  printValue("phase2_shared_loads", 0.0);
+  printValue("compute_per_point", 42.0);
+  printValue("phase3_shared_loads", 13.0);
+  printValue("phase4_global_stores", 1.0);
+  printValue("shared_stores", 1.0);
+  printValue("num_fields", 1.0);
+  printValue("data_size", 4.0);
+  printValue("Dimensions", 2);
 
 
 

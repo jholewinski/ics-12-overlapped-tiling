@@ -148,6 +148,7 @@ elif arch == 'gt200':
     max_warps_per_sm = 32.0
     max_threads_per_sm = 1024.0
     max_blocks_per_sm = 8.0
+    max_regs_per_sm = 16384.0
     num_sm = 30.0
     gmem_bandwidth = 144e9
     smem_bandwidth = 147.2e9
@@ -156,9 +157,9 @@ elif arch == 'gt200':
 
     c_load = 4.0
     c_op = 4.0
-    B_gmem = 40.0
-    B_smem = 16.0
-    L_gmem = 750.0
+    B_gmem = 32.0
+    B_smem = 4.0
+    L_gmem = 550.0
     L_smem = 32.0
 
     launch_penalty = 2000
@@ -204,21 +205,21 @@ if dim == 1:
 elif dim == 2:
     #block_size_x = range(32, 256+1, 32)
     #block_size_y = range(1, 32+1, 1)
-    block_size_x = [64]
+    block_size_x = [32]
     #block_size_x = [256]
     block_size_y = [8]
     block_size_z = [1]
 else:
-    block_size_x = [8, 16, 32]
-    block_size_y = [2, 4, 6]
-    block_size_z = [2, 4, 6]
+    block_size_x = [8]
+    block_size_y = [4]
+    block_size_z = [4]
 
 
-#time_tile_size = range(1, 12+1, 1)
-#elems_per_thread = range(1, 12+1, 1)
+time_tile_size = range(1, 6+1)
+elems_per_thread = range(2, 12+1, 2)
 
-time_tile_size = [2]
-elems_per_thread = [1]
+#time_tile_size = [1, 2]
+#elems_per_thread = [1]
 
 phases = [0]
 
@@ -237,7 +238,7 @@ for x in block_size_x:
 
 
 # Output Headers
-headers = ['x', 'y', 'z', 't', 'e', 'phase_limit', 'real_elapsed', 'real_per_stage', 'active_warps', 'full_invocations', 'extra_invocations', 'extra_global', 'extra_shared', 'num_stages', 't_glb', 't_shd', 't_stage', 't_stage_extra', 'sim_elapsed', 'sim_elapsed_clk', 'pts_per_clk']
+headers = ['x', 'y', 'z', 't', 'e', 'phase_limit', 'real_elapsed', 'real_per_stage', 'active_warps', 'blocks_from_max_warps', 'blocks_from_max_shared', 'blocks_from_max_regs', 'shared_per_block', 'full_invocations', 'extra_invocations', 'extra_global', 'extra_shared', 'num_stages', 't_glb', 't_shd', 't_stage', 't_stage_extra', 'sim_elapsed', 'sim_elapsed_clk', 'sim_elapsed_upper', 'sim_elapsed_upper_clk', 'glb_factor', 'shd_factor', 'pts_per_clk']
 
 # Print header
 for h in headers:
@@ -267,11 +268,11 @@ for (x, y, z, t, e, phase_limit) in configs:
     if dim == 1:
         problem_size = 5000
     elif dim == 2:
-        problem_size = 400
+        problem_size = 1800
     else:
         problem_size = 64
 
-    time_steps = 2
+    time_steps = 63
 
 
     """
@@ -282,6 +283,7 @@ for (x, y, z, t, e, phase_limit) in configs:
         doc = yaml.load(stdout)
         real_elapsed = float(doc['Elapsed Time'])
         num_blocks_x = float(doc['Num Blocks X'])
+        regs_per_thread = float(doc['Register Usage'])
         try:
             num_blocks_y = float(doc['Num Blocks Y'])
         except:
@@ -301,11 +303,30 @@ for (x, y, z, t, e, phase_limit) in configs:
     Derived Stats
     """
     warps_per_block = x*y*z/warp_size
-    shared_per_block = (x+2.0) * (y+2.0) * (z+2.0) * 4.0  # ESTIMATE
+
+    if dim == 1:
+        shared_per_block = (e*x+2.0) * 4.0
+    elif dim == 2:
+        shared_per_block = (x+2.0) * (e*y+2.0) * 4.0
+    elif dim == 3:
+        shared_per_block = (x+2.0) * (e*y+2.0) * (z+2.0) * 4.0  # ESTIMATE
+    else:
+        print('Invalid dim')
+        exit(1)
+
+    regs_per_block = regs_per_thread*x*y*z
+
+    blocks_from_max_warps = math.floor(max_warps_per_sm / warps_per_block)
+    blocks_from_max_shared = math.floor(total_shared / shared_per_block)
+    blocks_from_max_regs = math.floor(max_regs_per_sm / regs_per_block)
+
     blocks_per_sm = min(
-        math.floor(max_warps_per_sm / warps_per_block),
-        math.floor(total_shared / shared_per_block))
+        blocks_from_max_warps,
+        blocks_from_max_shared,
+        blocks_from_max_regs)
     blocks_per_sm = max(min(blocks_per_sm, max_blocks_per_sm), 1.0)
+
+
 
     active_warps = warps_per_block * blocks_per_sm
 
@@ -389,33 +410,58 @@ for (x, y, z, t, e, phase_limit) in configs:
 
     t_glb = max(c_load*(p2_glb+p2_shd)*active_warps + c_op*k_op*active_warps,
                 L_gmem + c_load + max(Bprime*p2_glb*active_warps, B_smem*p2_shd*active_warps))
+    t_glb_upper = max(0,#c_load*(p2_glb+p2_shd)*active_warps + c_op*k_op*active_warps,
+                      L_gmem + c_load + max(Bprime*p2_glb*active_warps, B_smem*p2_shd*active_warps) + c_op*k_op*active_warps + c_load*(p2_glb+p2_shd)*active_warps)
 
     #t_glb = max(c_load*(p2_glb+p2_shd)*active_warps + c_op*k_op*active_warps,
     #            L_gmem + c_load + B_gmem*p2_glb*active_warps)
 
     t_shd = max(c_load*phase3_shared_loads*e*active_warps + c_op*k_op*active_warps,
                 L_smem + c_load + B_smem *phase3_shared_loads*e*active_warps)
+    t_shd_upper = max(0,#c_load*phase3_shared_loads*e*active_warps + c_op*k_op*active_warps,
+                      L_smem + c_load + B_smem *phase3_shared_loads*e*active_warps + c_op*k_op*active_warps + c_load*phase3_shared_loads*e*active_warps)
+
+    if c_load*(p2_glb+p2_shd)*active_warps + c_op*k_op*active_warps > L_gmem + c_load + max(Bprime*p2_glb*active_warps, B_smem*p2_shd*active_warps):
+        glb_factor = 'latency'
+    else:
+        glb_factor = 'bandwidth'
+
+    if c_load*phase3_shared_loads*e*active_warps + c_op*k_op*active_warps > L_smem + c_load + B_smem *phase3_shared_loads*e*active_warps:
+        shd_factor = 'latency'
+    else:
+        shd_factor = 'bandwidth'
 
     t_phase1 = c_op*20*active_warps
 
     if phase_limit == 1:
         t_stage = 0.0
         t_stage_extra = 0.0
+        t_stage_upper = 0.0
+        t_stage_extra_upper = 0.0
     elif phase_limit == 2:
         t_stage = t_glb
         t_stage_extra = t_glb
+        t_stage_upper = t_glb_upper
+        t_stage_extra_upper = t_glb_upper
     elif phase_limit == 3:
         t_stage = (t-1)*t_shd
         t_stage_extra = (extra_shared)*t_shd
+        t_stage_upper = (t-1)*t_shd_upper
+        t_stage_extra_upper = (extra_shared)*t_shd_upper
     else:
         t_stage = t_glb + (t-1)*t_shd
         t_stage_extra = (extra_global*t_glb) + (extra_shared*t_shd)
+        t_stage_upper = t_glb_upper + (t-1)*t_shd_upper
+        t_stage_extra_upper = (extra_global*t_glb_upper) + (extra_shared*t_shd_upper)
 
     t_stage = t_stage + t_phase1
+    t_stage_upper = t_stage_upper + t_phase1
+
     if extra_global > 0:
         t_stage_extra = t_stage_extra + t_phase1
+        t_stage_extra_upper = t_stage_extra_upper + t_phase1
     
-    t_stage_total = t_stage + t_stage_extra
+    #t_stage_total = t_stage + t_stage_extra
 
 
     #sim_elapsed = (t_stage + invocations*launch_penalty) / clock * num_stages * full_invocations
@@ -424,6 +470,12 @@ for (x, y, z, t, e, phase_limit) in configs:
     if extra_global > 0:
         sim_elapsed_clk = sim_elapsed_clk + ((t_stage_extra * num_stages) + launch_penalty)
     sim_elapsed = sim_elapsed_clk / clock
+
+
+    sim_elapsed_upper_clk = ((t_stage_upper * num_stages) + full_invocations*launch_penalty) * (int(time_steps) / int(t))
+    if extra_global > 0:
+        sim_elapsed_upper_clk = sim_elapsed_upper_clk + ((t_stage_extra_upper * num_stages) + launch_penalty)
+    sim_elapsed_upper = sim_elapsed_upper_clk / clock
 
 
     if t_stage > 0.0:

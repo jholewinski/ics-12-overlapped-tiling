@@ -1,0 +1,10 @@
+
+path = opencl/poisson-3d
+
+# Sources
+build $path/poisson-3d.o : cxx-build $path/poisson-3d.cpp
+
+# Executable
+build $bindir/ocl-poisson-3d : link-executable $path/poisson-3d.o $bindir/libclcommon.a
+  ldflags = $ldflags -lboost_program_options -lboost_regex
+

@@ -50,6 +50,8 @@ struct GeneratorParams {
 
   int32_t phaseLimit;
 
+  int32_t numBlocksZ;
+  
   /**
    * Default constructor.
    */
@@ -101,6 +103,8 @@ struct GeneratorParams {
        sharedSizeY < 1 || paddedSize < 1) {
       throw std::runtime_error("Consistency error!");
     }
+
+    numBlocksZ = 1;
   }
 };
 

@@ -46,8 +46,10 @@ public:
     printValue("Time Tile Size", params.timeTileSize);
     printValue("Block Size X", params.blockSizeX);
     printValue("Block Size Y", params.blockSizeY);
+    printValue("Block Size Z", params.blockSizeZ);
     printValue("Num Blocks X", params.numBlocksX);
     printValue("Num Blocks Y", params.numBlocksY);
+    printValue("Num Blocks Z", params.numBlocksZ);
     printValue("Elements/Thread", params.elementsPerThread);
     printValue("Shared Size", sharedSize);
     printValue("Total FP/Block", totalFPPerBlock);
@@ -60,6 +62,8 @@ public:
     printValue("Real Per Block X", params.realPerBlockX);
     printValue("Real Per Block Y", params.realPerBlockY);
     printValue("Padded Size", params.paddedSize);
+    printValue("phase_limit", params.phaseLimit);
+    printValue("Time Steps", params.timeSteps);
   }
 
 };

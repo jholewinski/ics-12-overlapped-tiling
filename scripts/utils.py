@@ -64,6 +64,11 @@ def run_experiment(filename):
         block_size_y = [1]
         block_size_z = [1]
 
+    try:
+        phase_limit = data['phase_limit']
+    except:
+        phase_limit = 0
+
     output = open(outfile, 'w')
 
     num_runs = len(problem_size) * len(time_steps) * len(elements_per_thread) \
@@ -101,7 +106,9 @@ def run_experiment(filename):
                                         '-s',
                                         '%d' % tt,
                                         '-x',
-                                        '%d' % bsx]
+                                        '%d' % bsx,
+                                        '-p',
+                                        '%d' % phase_limit]
 
                                 if dimensions > 1:
                                     args.append('-y')
@@ -121,7 +128,7 @@ def run_experiment(filename):
                                     time.sleep(0.1)
                                     now = time.time()
                                     elapsed = now - start_time
-                                    if elapsed > 10.0:
+                                    if elapsed > 60.0:
                                         print('Watchdog timer expired!')
                                         proc.terminate()
                                         proc.wait()
