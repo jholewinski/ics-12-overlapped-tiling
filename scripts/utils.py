@@ -69,6 +69,11 @@ def run_experiment(filename):
     except:
         phase_limit = 0
 
+    try:
+        counters = data['counters'].split(',')
+    except:
+        counters = []
+
     output = open(outfile, 'w')
 
     num_runs = len(problem_size) * len(time_steps) * len(elements_per_thread) \
@@ -117,7 +122,10 @@ def run_experiment(filename):
                                         args.append('-z')
                                         args.append('%d' % bsz)
 
+                                args = ' '.join(args)
+
                                 proc = subprocess.Popen(args,
+                                                        shell=True,
                                                         stdout=subprocess.PIPE,
                                                         stderr=subprocess.PIPE)
 
@@ -128,7 +136,7 @@ def run_experiment(filename):
                                     time.sleep(0.1)
                                     now = time.time()
                                     elapsed = now - start_time
-                                    if elapsed > 60.0:
+                                    if elapsed > 15.0:
                                         print('Watchdog timer expired!')
                                         proc.terminate()
                                         proc.wait()
@@ -147,6 +155,54 @@ def run_experiment(filename):
 
                                 elapsed = end_time - start_time
                                 total   = time.time() - total_start
+
+                                for cnt in counters:
+                                    if proc.returncode == 0:
+                                        with open('experiment-profiler.conf', 'w') as conf:
+                                            conf.write(cnt)
+                                    prof_args = 'COMPUTE_PROFILE=1 COMPUTE_PROFILE_CONFIG=experiment-profiler.conf COMPUTE_PROFILE_CSV=1 %s' % args
+                                    
+                                    proc = subprocess.Popen(prof_args,
+                                                            shell=True,
+                                                            stdout=subprocess.PIPE,
+                                                            stderr=subprocess.PIPE)
+
+                                    # Keep a watchdog on the process
+                                    start_time = time.time()
+
+                                    while proc.poll() == None:
+                                        time.sleep(0.1)
+                                        now = time.time()
+                                        elapsed = now - start_time
+                                        if elapsed > 15.0:
+                                            print('Watchdog timer expired!')
+                                            proc.terminate()
+                                            proc.wait()
+                                            break
+
+                                    end_time = time.time()
+
+                                    if proc.returncode != 0:
+                                        print('- FAILURE:')
+                                        print(proc.stdout.read())
+                                        print(proc.stderr.read())
+                                    else:
+                                        all_values = []
+                                        with open('opencl_profile_0.log') as log:
+                                            for line in log.readlines():
+                                                line = line.strip()
+                                                if line.startswith('kernel_func'):
+                                                    value = line.split(',')[-1]
+                                                    all_values.append(int(value))
+                                            #for line in proc.stdout.readlines():
+                                            #    output.write('%d#%s' % (curr, line))
+                                            value_avg = float(sum(all_values)) / float(len(all_values))
+                                            output.write('%d#%s: %f\n' % (curr, cnt.strip(), value_avg))
+                                            output.flush()
+
+                                    elapsed = end_time - start_time
+                                    total   = time.time() - total_start
+
 
                                 seconds_per_run = total / float(curr)
                                 remaining_runs  = float(num_runs) - float(curr)

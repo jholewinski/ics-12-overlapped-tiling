@@ -31,7 +31,7 @@ with open(sys.argv[1]) as data:
 
 
 # Output Headers
-headers = ['count', 'x', 'y', 'z', 't', 'e', 'phase_limit', 'real_elapsed', 'event_elapsed', 'real_per_stage', 'active_warps', 'blocks_from_max_warps', 'blocks_from_max_shared', 'blocks_from_max_regs', 'shared_per_block', 'blocks_per_sm', 'num_blocks_x', 'num_blocks_y', 'num_blocks_z', 'full_invocations', 'extra_invocations', 'extra_global', 'extra_shared', 'num_stages', 't_glb', 't_shd', 't_phase1', 't_stage', 't_stage_extra', 'sim_elapsed', 'sim_elapsed_clk', 'sim_elapsed_upper', 'sim_elapsed_upper_clk', 'glb_factor', 'shd_factor', 'pts_per_clk']
+headers = ['count', 'x', 'y', 'z', 't', 'e', 'phase_limit', 'real_elapsed', 'event_elapsed', 'real_per_stage', 'active_warps', 'blocks_from_max_warps', 'blocks_from_max_shared', 'blocks_from_max_regs', 'shared_per_block', 'blocks_per_sm', 'num_blocks_x', 'num_blocks_y', 'num_blocks_z', 'full_invocations', 'extra_invocations', 'extra_global', 'extra_shared', 'num_stages', 't_glb', 't_shd', 't_phase1', 't_stage', 't_stage_extra', 'sim_elapsed', 'sim_elapsed_clk', 'sim_elapsed_upper', 'sim_elapsed_upper_clk', 'glb_factor', 'shd_factor', 'pts_per_clk', 'badness']
 
 # Print header
 for h in headers:
@@ -60,7 +60,19 @@ for run in all_runs:
     e = int(run['Elements/Thread'])
     t = int(run['Time Tile Size'])
 
+
     dim = int(run['Dimensions'])
+
+    size_ratio = float(x) / float(y*e)
+    if dim == 3:
+        size_ratio_xz = float(x) / float(z)
+        size_ratio_yz = float(y*e) / float(z)
+        size_ratio = (size_ratio + size_ratio_xz + size_ratio_yz) / 3.0
+
+    badness = abs(size_ratio - 1.0)
+
+    if badness > 2.0:
+        continue
 
     regs_per_thread = int(run['Register Usage'])
 
@@ -158,43 +170,57 @@ for run in all_runs:
     """    
 
     # Cache Model
-    if arch == 'fermi' or arch == 'gcn':
-        if prog == 'j2d':
-            p2_glb = 5.0*e
-            p2_glb = e+4.0
-        elif prog == 'fdtd2d':
-            e_min = elems_per_thread[0]
-            e_max = elems_per_thread[-1]
+    if cache_model == 'fermi':
+        # if prog == 'j2d':
+        #     p2_glb = 5.0*e
+        #     p2_glb = e+4.0
+        # elif prog == 'fdtd2d':
+        #     e_min = elems_per_thread[0]
+        #     e_max = elems_per_thread[-1]
 
-            t1 = e_max - e_min
-            t2 = e_max - e
-            t3 = t2 / t1
-            t4 = t3 / 0.5
-            t5 = 1.0 - t4
+        #     t1 = e_max - e_min
+        #     t2 = e_max - e
+        #     t3 = t2 / t1
+        #     t4 = t3 / 0.5
+        #     t5 = 1.0 - t4
             
 
-            p2_glb = phase2_global_loads * e
-            p2_glb = 4.0 * e + 1.0
+        #     p2_glb = phase2_global_loads * e
+        #     p2_glb = 4.0 * e + 1.0
 
-        elif prog == 'g2d':
-            p2_glb = e + 4.0
-        elif prog == 'p2d':
-            p2_glb = 3*e + 6.0
-        elif prog == 'rician2d':
-            p2_glb = e + 4.0
-        elif prog == 'j3d':
-            p2_glb = 3.0*e + 4.0
-        elif prog == 'tv2d':
-            p2_glb = 2.0*e + 5.0
-        elif prog == 'j1d':
-            p2_glb = phase2_global_loads * e
-        else:
-            sys.stderr.write('No cache model!\n')
-            exit(1)
+        # elif prog == 'g2d':
+        #     p2_glb = e + 4.0
+        # elif prog == 'p2d':
+        #     p2_glb = 3*e + 6.0
+        # elif prog == 'rician2d':
+        #     p2_glb = e + 4.0
+        # elif prog == 'j3d':
+        #     p2_glb = 3.0*e + 4.0
+        # elif prog == 'tv2d':
+        #     p2_glb = 2.0*e + 5.0
+        # elif prog == 'j1d':
+        #     p2_glb = phase2_global_loads * e
+        # else:
+        #     sys.stderr.write('No cache model!\n')
+        #     exit(1)
+
+        #if dim == 3 and phase2_global_loads == 7.0:
+        #    p2_glb = 3.0*e + 4.0
+        #else:
+        #    sys.stderr.write('Dont know how to apply cache model\n')
+        #    sys.exit(1)
+
+        misses = float(run['l1_global_load_miss'])
+        hits = float(run['l1_global_load_hit'])
+
+        miss_rate = misses / (misses + hits)
+
+        p2_glb = phase2_global_loads*e * miss_rate
+        p2_shd = phase2_shared_loads*e + phase2_global_loads*e - p2_glb
 
         #p2_glb = p2_glb * ((2.0 ** (1.0/8.0)) ** e)
-        p2_shd = phase2_global_loads*e - p2_glb
-        p2_shd = p2_shd + phase2_shared_loads*e
+        #p2_shd = phase2_global_loads*e - p2_glb
+        #p2_shd = p2_shd + phase2_shared_loads*e
 
     else:
         # No Cache
@@ -332,4 +358,4 @@ sys.stderr.write('# Maximum Overhead: %f\n' % max_overhead)
 sys.stderr.write('# Average Error:    %f\n' % avg_error)
 sys.stderr.write('# Maximum Error:    %f\n' % max_error)
 sys.stderr.write('# Minimum Error:    %f\n' % min_error)
-
+sys.stderr.write('# Num Results:      %d (Culled: %d)\n' % (len(results), (len(all_runs) - len(results))))
