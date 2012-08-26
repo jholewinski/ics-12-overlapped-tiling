@@ -28,7 +28,7 @@ struct GeneratorParams {
   int32_t     blockSizeZ;
   int32_t     problemSize;
   std::string dataType;
-
+  
   // Derived
   int32_t     padding;
   int32_t     compsPerBlockX;
@@ -643,7 +643,7 @@ int main(int argc,
   ProgramGenerator::printProgramParameters(params, 3, 8, 3, 11);
 
   // Create a command queue.
-  cl::CommandQueue queue(context.context(), context.device(), 0, &result);
+  cl::CommandQueue queue(context.context(), context.device(), CL_QUEUE_PROFILING_ENABLE, &result);
   CLContext::throwOnError("cl::CommandQueue", result);
 
   // Build a program from the source
@@ -814,6 +814,8 @@ int main(int argc,
 
   cl::Event waitEvent;
 
+  std::vector<cl::Event> AllEvents;
+  
   double startTime = rtclock();
 
   for(int t = 0; t < params.timeSteps; t += params.timeTileSize) {
@@ -840,6 +842,7 @@ int main(int argc,
                                         0, &waitEvent);
     CLContext::throwOnError("Kernel launch failed", result);
 
+    AllEvents.push_back(waitEvent);
     std::swap(inputBufferEX, outputBufferEX);
     std::swap(inputBufferEY, outputBufferEY);
     std::swap(inputBufferHZ, outputBufferHZ);
@@ -849,6 +852,18 @@ int main(int argc,
 
   double endTime = rtclock();
   double elapsed = endTime - startTime;
+
+  cl_ulong EventStart;
+  cl_ulong EventEnd;
+  
+  CLContext::throwOnError("Profile error", AllEvents[0].getProfilingInfo(CL_PROFILING_COMMAND_START, &EventStart));
+  CLContext::throwOnError("Profile error", AllEvents[AllEvents.size()-1].getProfilingInfo(CL_PROFILING_COMMAND_END, &EventEnd));
+
+  size_t ProfileTimerResolution = context.device()
+    .getInfo<CL_DEVICE_PROFILING_TIMER_RESOLUTION>();
+
+  printValue("EventElapsed", (EventEnd-EventStart)*1e-9);
+  printValue("ProfileTimerResolution", ProfileTimerResolution);
 
   // Copy results back to host
   result = queue.enqueueReadBuffer(*inputBufferEX, CL_TRUE, 0,
@@ -882,6 +897,18 @@ int main(int argc,
     //compareResults(reference, hostData, params);
   }
 
+  printValue("phase2_global_loads", 7.0);
+  printValue("phase2_shared_loads", 4.0);
+  printValue("compute_per_point", 11.0);
+  printValue("phase3_shared_loads", 5.0);
+  printValue("phase4_global_stores", 3.0);
+  printValue("shared_stores", 3.0);
+  printValue("num_fields", 3.0);
+  printValue("data_size", 4.0);
+
+  printValue("phase_limit", params.phaseLimit);
+  
+  printValue("Dimensions", 2);
 
 
   // Clean-up

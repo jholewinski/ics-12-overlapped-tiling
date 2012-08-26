@@ -71,7 +71,7 @@ for run in all_runs:
 
     badness = abs(size_ratio - 1.0)
 
-    if badness > 2.0:
+    if badness > 1.0:
         continue
 
     regs_per_thread = int(run['Register Usage'])

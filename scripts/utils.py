@@ -158,9 +158,9 @@ def run_experiment(filename):
 
                                 for cnt in counters:
                                     if proc.returncode == 0:
-                                        with open('experiment-profiler.conf', 'w') as conf:
+                                        with open('/tmp/experiment-profiler.conf', 'w') as conf:
                                             conf.write(cnt)
-                                    prof_args = 'COMPUTE_PROFILE=1 COMPUTE_PROFILE_CONFIG=experiment-profiler.conf COMPUTE_PROFILE_CSV=1 %s' % args
+                                    prof_args = 'COMPUTE_PROFILE=1 COMPUTE_PROFILE_CONFIG=/tmp/experiment-profiler.conf COMPUTE_PROFILE_LOG=/tmp/prof.log COMPUTE_PROFILE_CSV=1 %s' % args
                                     
                                     proc = subprocess.Popen(prof_args,
                                                             shell=True,
@@ -188,7 +188,7 @@ def run_experiment(filename):
                                         print(proc.stderr.read())
                                     else:
                                         all_values = []
-                                        with open('opencl_profile_0.log') as log:
+                                        with open('/tmp/prof.log') as log:
                                             for line in log.readlines():
                                                 line = line.strip()
                                                 if line.startswith('kernel_func'):
