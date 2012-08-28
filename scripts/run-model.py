@@ -29,9 +29,8 @@ with open(sys.argv[1]) as data:
 
 
 
-
 # Output Headers
-headers = ['count', 'x', 'y', 'z', 't', 'e', 'phase_limit', 'real_elapsed', 'event_elapsed', 'real_per_stage', 'active_warps', 'blocks_from_max_warps', 'blocks_from_max_shared', 'blocks_from_max_regs', 'shared_per_block', 'blocks_per_sm', 'num_blocks_x', 'num_blocks_y', 'num_blocks_z', 'full_invocations', 'extra_invocations', 'extra_global', 'extra_shared', 'num_stages', 't_glb', 't_shd', 't_phase1', 't_stage', 't_stage_extra', 'sim_elapsed', 'sim_elapsed_clk', 'sim_elapsed_upper', 'sim_elapsed_upper_clk', 'glb_factor', 'shd_factor', 'pts_per_clk', 'badness']
+headers = ['count', 'x', 'y', 'z', 't', 'e', 'phase_limit', 'real_elapsed', 'event_elapsed', 'real_per_stage', 'active_warps', 'blocks_from_max_warps', 'blocks_from_max_shared', 'blocks_from_max_regs', 'shared_per_block', 'blocks_per_sm', 'num_blocks_x', 'num_blocks_y', 'num_blocks_z', 'full_invocations', 'extra_invocations', 'extra_global', 'extra_shared', 'num_stages', 't_glb', 't_shd', 't_phase1', 't_stage', 't_stage_extra', 'sim_elapsed', 'sim_elapsed_clk', 'sim_elapsed_upper', 'sim_elapsed_upper_clk', 'glb_factor', 'shd_factor', 'pts_per_clk', 'badness', 'regs_per_thread', 'rel_overhead']
 
 # Print header
 for h in headers:
@@ -41,6 +40,11 @@ sys.stdout.flush()
 
 
 min_real = 100000.0
+
+for run in all_runs:
+    event_elapsed = float(run['EventElapsed'])
+    min_real = min(min_real, event_elapsed)
+
 
 results = []
 
@@ -60,7 +64,6 @@ for run in all_runs:
     e = int(run['Elements/Thread'])
     t = int(run['Time Tile Size'])
 
-
     dim = int(run['Dimensions'])
 
     size_ratio = float(x) / float(y*e)
@@ -71,10 +74,13 @@ for run in all_runs:
 
     badness = abs(size_ratio - 1.0)
 
-    if badness > 1.0:
-        continue
+    #if badness > 1.0:
+    #    continue
 
     regs_per_thread = int(run['Register Usage'])
+
+    if regs_per_thread >= 62:
+        continue
 
     num_blocks_x = int(run['Num Blocks X'])
     num_blocks_y = int(run['Num Blocks Y'])
@@ -96,7 +102,9 @@ for run in all_runs:
     real_elapsed = float(run['Elapsed Time'])
 
     event_elapsed = float(run['EventElapsed'])
-    
+
+    num_fields = float(run['num_fields'])
+
     """
     Derived Stats
     """
@@ -111,6 +119,8 @@ for run in all_runs:
     else:
         print('Invalid dim')
         exit(1)
+
+    shared_per_block = shared_per_block * num_fields
 
     regs_per_block = regs_per_thread*x*y*z
 
@@ -138,6 +148,9 @@ for run in all_runs:
 
 
     active_warps = warps_per_block * blocks_per_sm
+
+    #if (active_warps/max_warps_per_sm) < 0.75:
+    #    continue
 
     real_per_block_x = x - 2.0 * (t-1.0) # ESTIMATE
     if dim > 1:
@@ -213,7 +226,10 @@ for run in all_runs:
         misses = float(run['l1_global_load_miss'])
         hits = float(run['l1_global_load_hit'])
 
-        miss_rate = misses / (misses + hits)
+        if misses > 0.0 or hits > 0.0:
+            miss_rate = misses / (misses + hits)
+        else:
+            miss_rate = 1.0
 
         p2_glb = phase2_global_loads*e * miss_rate
         p2_shd = phase2_shared_loads*e + phase2_global_loads*e - p2_glb
@@ -230,7 +246,7 @@ for run in all_runs:
     k_op = compute_per_point * e
 
     #Bprime = 8.0*p2_glb + B_gmem
-    Bprime = B_gmem
+    Bprime = B_gmem + (1.0 + 1.0/(x/32.0))
 
     #t_glb = max(c_load*(p2_glb+p2_shd)*active_warps + c_op*k_op*active_warps + c_load*(p2_glb+p2_shd)*active_warps_extra + c_op*k_op*active_warps_extra,
     #            L_gmem + c_load + max(Bprime*p2_glb*active_warps + extra_blocks_bw*p2_glb*active_warps_extra, B_smem*p2_shd*active_warps + B_smem*p2_shd*active_warps_extra))
@@ -263,6 +279,7 @@ for run in all_runs:
     write_back = L_gmem + c_load + B_gmem*phase4_global_stores*active_warps
 
     t_phase1 = (30*e+50)*active_warps
+    #t_phase1 = 0.0
 
     if phase_limit == 1:
         t_stage = 0.0
@@ -315,7 +332,8 @@ for run in all_runs:
     else:
         pts_per_clk = 0.0
 
-    min_real = min(min_real, event_elapsed)
+
+    rel_overhead = event_elapsed / min_real
 
     error = abs((sim_elapsed - event_elapsed) / event_elapsed)
     avg_error = avg_error + error

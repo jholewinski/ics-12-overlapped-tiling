@@ -663,13 +663,14 @@ int main(int argc,
   }
 
   // Extract out the register usage
-  std::string log =
+  std::string log = 
     program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(context.device());
-  boost::regex regExpr("Used ([0-9]+) registers");
-  boost::smatch match;
+  boost::regex                regExpr("Used ([0-9]+) registers");
+  boost::smatch               match;
   std::string::const_iterator start, end;
-  start = log.begin();
-  end = log.end();
+  start           = log.begin();
+  end             = log.end();
+  std::cerr << log << "\n";
   if(boost::regex_search(start, end, match, regExpr,
                          boost::match_default)) {
     printValue("Register Usage", match[1]);
