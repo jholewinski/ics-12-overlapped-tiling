@@ -28,3 +28,5 @@ L_smem=32.0
 launch_penalty=6500
 
 warp_size=32.0
+
+cache_model='gt200'

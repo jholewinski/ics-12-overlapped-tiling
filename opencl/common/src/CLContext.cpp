@@ -41,7 +41,7 @@ CLContext::CLContext() {
 
   device_ = allDevices[0];
 
-  //printValue("Device", device_.getInfo<CL_DEVICE_NAME>());
+  printValue("Device", device_.getInfo<CL_DEVICE_NAME>());
 }
 
 CLContext::~CLContext() {

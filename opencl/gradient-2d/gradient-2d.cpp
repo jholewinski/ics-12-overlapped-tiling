@@ -621,7 +621,7 @@ int main(int argc,
   std::vector<cl::Device> devices;
   devices.push_back(context.device());
 
-  result = program.build(devices, "");
+  result = program.build(devices, "-cl-nv-verbose");
   if(result != CL_SUCCESS) {
     std::cout << "Source compilation failed.\n";
     std::cout << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(context.device());
@@ -629,13 +629,13 @@ int main(int argc,
   }
 
   // Extract out the register usage
-  std::string log =
+  std::string log = 
     program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(context.device());
-  boost::regex regExpr("Used ([0-9]+) registers");
-  boost::smatch match;
+  boost::regex                regExpr("Used ([0-9]+) registers");
+  boost::smatch               match;
   std::string::const_iterator start, end;
-  start = log.begin();
-  end = log.end();
+  start           = log.begin();
+  end             = log.end();
   if(boost::regex_search(start, end, match, regExpr,
                          boost::match_default)) {
     printValue("Register Usage", match[1]);
