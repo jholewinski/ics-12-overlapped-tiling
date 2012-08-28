@@ -31,13 +31,21 @@ for (run, values) in runs.iteritems():
             sys.stdout.write('%s,' % col)
         sys.stdout.write('\n')
 
+    line = ''
+    error = False
     for col in columns:
-        sys.stdout.write('%s,' % values[col])
-    sys.stdout.write('\n')
+        try:
+            val = values[col]
+        except:
+            sys.stderr.write('Warning: missing %s for run %d\n' % (col, run))
+            val = '0'
+            error = True
+        line = line + ('%s,' % val)
+
+    if not error:
+        sys.stdout.write('%s\n' % line)
+    else:
+        sys.stderr.write('Skipping run %d\n' % run)
 
 sys.stdout.flush()
-
-    
-            
-
 
