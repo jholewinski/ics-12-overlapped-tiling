@@ -74,6 +74,8 @@ for run in all_runs:
 
     badness = abs(size_ratio - 1.0)
 
+    #if x != 64 or y != 8:
+    #   continue
     #if badness > 1.0:
     #    continue
 
@@ -278,8 +280,13 @@ for run in all_runs:
 
     write_back = L_gmem + c_load + B_gmem*phase4_global_stores*active_warps
 
-    t_phase1 = (30*e+50)*active_warps
-    #t_phase1 = 0.0
+    if compute_cap == '1.3':
+        t_phase1 = (30*e+50)*active_warps
+    elif compute_cap == '2.0':
+        t_phase1 = (10*e+20)*active_warps
+    else:
+        sys.stderr.write('Unknown compute_cap\n')
+        exit(1)
 
     if phase_limit == 1:
         t_stage = 0.0
