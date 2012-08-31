@@ -1,0 +1,13 @@
+name:         Jacobi 2D Scaling
+outfile:      j3d.raw.dat
+binary:       ../../build.out/ocl-jacobi-3d
+dimensions:   3
+counters:     l1_global_load_hit, l1_global_load_miss, fb_subp0_read_sectors, fb_subp1_read_sectors
+parameters:
+    block_size_x:         [8, 32, 8]
+    block_size_y:         [2, 8, 2]
+    block_size_z:         [2, 8, 2]
+    time_tile_size:       [1, 4]
+    problem_size:         200
+    time_steps:           64
+    elements_per_thread:  [1, 8]

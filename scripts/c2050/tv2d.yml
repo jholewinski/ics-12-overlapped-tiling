@@ -1,0 +1,14 @@
+name:         Jacobi 2D Scaling
+outfile:      tv2d.raw.dat
+binary:       ../../build.out/ocl-cdsc-tv-update-2d
+dimensions:   2
+phase_limit:  0
+counters:     l1_global_load_hit, l1_global_load_miss, fb_subp0_read_sectors, fb_subp1_read_sectors
+parameters:
+    block_size_x:         [32, 128, 32]
+    block_size_y:         [4, 12, 2]
+    time_tile_size:       [1, 8, 1]
+    problem_size:         6000
+    time_steps:           64
+    elements_per_thread:  [1, 12, 1]
+

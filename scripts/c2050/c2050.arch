@@ -1,0 +1,26 @@
+total_shared = 49152.0
+max_warps_per_sm = 48.0
+max_threads_per_sm = 1536.0
+max_blocks_per_sm = 8.0
+max_regs_per_sm = 32768.0
+num_sm = 14.0
+gmem_bandwidth = 120e9
+smem_bandwidth = 147.2e9
+cpi = 1.0
+clock = 1.15e9
+
+c_load = 2.0
+c_op = 1.0
+B_gmem = 18.0
+B_smem = 2.0
+L_gmem = 750.0
+L_smem = 32.0
+
+launch_penalty = 0
+
+warp_size = 32.0
+
+cache_model = 'fermi'
+compute_cap = '2.0'
+
+max_regs_per_thread = 63.0
