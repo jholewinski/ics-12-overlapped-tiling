@@ -113,7 +113,9 @@ def run_experiment(filename):
                                         '-x',
                                         '%d' % bsx,
                                         '-p',
-                                        '%d' % phase_limit]
+                                        '%d' % phase_limit,
+                                        '-w',
+                                        '/tmp/temp-kernel.cl']
 
                                 if dimensions > 1:
                                     args.append('-y')
@@ -156,6 +158,26 @@ def run_experiment(filename):
                                 elapsed = end_time - start_time
                                 total   = time.time() - total_start
 
+
+                                if proc.returncode == 0:
+                                    ret = subprocess.call('~/projects/llvm/tests/dump-cl-binary.x /tmp/temp-kernel.cl', shell=True)
+                                    assert(ret == 0)
+                                    ret = subprocess.call('ptxas -arch sm_20 /tmp/temp-kernel.cl.ptx -o /tmp/temp-kernel.o', shell=True)
+                                    assert(ret == 0)
+                                    proc = subprocess.Popen('cuobjdump -sass /tmp/temp-kernel.o', shell=True, stdout=subprocess.PIPE)
+                                    (sass_out, _) = proc.communicate()
+                                    assert(proc.returncode == 0)
+
+                                    num_fadd = sass_out.count('FADD')
+                                    num_fmul = sass_out.count('FMUL')
+                                    num_ffma = sass_out.count('FFMA')
+                                    num_mufu = sass_out.count('MUFU')
+                                    num_fsetp = sass_out.count('FSETP')
+
+                                    output.write('%d#num_fp: %d\n' % (curr, (num_fadd+num_fmul+num_ffma+num_fsetp)))
+                                    output.write('%d#num_sfu: %d\n' % (curr, num_mufu))
+
+
                                 for cnt in counters:
                                     if proc.returncode == 0:
                                         with open('/tmp/experiment-profiler.conf', 'w') as conf:
@@ -193,7 +215,7 @@ def run_experiment(filename):
                                                 line = line.strip()
                                                 if line.startswith('kernel_func'):
                                                     value = line.split(',')[-1]
-                                                    all_values.append(int(value))
+                                                    all_values.append(float(value))
                                             #for line in proc.stdout.readlines():
                                             #    output.write('%d#%s' % (curr, line))
                                             value_avg = float(sum(all_values)) / float(len(all_values))

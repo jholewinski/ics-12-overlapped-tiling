@@ -891,10 +891,10 @@ int main(int argc,
     * (double)params.elementsPerThread * 27.0 * (double)params.timeSteps
     / elapsed / 1e9;
 
-  printValue("phase2_global_loads", 9.0);
+  printValue("phase2_global_loads", 27.0);
   printValue("phase2_shared_loads", 0.0);
   printValue("compute_per_point", 27.0);
-  printValue("phase3_shared_loads", 9.0);
+  printValue("phase3_shared_loads", 27.0);
   printValue("phase4_global_stores", 1.0);
   printValue("shared_stores", 1.0);
   printValue("num_fields", 1.0);
