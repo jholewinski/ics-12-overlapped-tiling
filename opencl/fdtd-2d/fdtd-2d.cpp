@@ -670,7 +670,7 @@ int main(int argc,
   std::string::const_iterator start, end;
   start           = log.begin();
   end             = log.end();
-  std::cerr << log << "\n";
+  //std::cerr << log << "\n";
   if(boost::regex_search(start, end, match, regExpr,
                          boost::match_default)) {
     printValue("Register Usage", match[1]);
