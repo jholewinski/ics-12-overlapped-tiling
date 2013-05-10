@@ -6,7 +6,7 @@ rule cxx-build
   depfile = $out.d
 
 rule link-executable
-  command = $cxx $ldflags $in -o $out
+  command = $cxx $in -o $out $ldflags
   description = LINK - $out
 
 rule static-lib
